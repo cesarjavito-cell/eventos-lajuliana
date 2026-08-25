@@ -1,0 +1,186 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 38 44% 96%;
+    --foreground: 24 15% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 24 15% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 24 15% 12%;
+    --primary: 96 22% 26%;
+    --primary-foreground: 38 44% 96%;
+    --secondary: 38 30% 92%;
+    --secondary-foreground: 24 15% 12%;
+    --muted: 38 24% 93%;
+    --muted-foreground: 30 8% 42%;
+    --accent: 24 52% 52%;
+    --accent-foreground: 38 44% 96%;
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 38 44% 96%;
+    --border: 38 20% 86%;
+    --input: 38 20% 86%;
+    --ring: 96 22% 26%;
+    --chart-1: 96 22% 26%;
+    --chart-2: 24 52% 52%;
+    --chart-3: 42 60% 50%;
+    --chart-4: 200 35% 45%;
+    --chart-5: 340 45% 55%;
+    --radius: 0.625rem;
+    --font-heading: 'Georgia', 'Times New Roman', ui-sans-serif, system-ui, sans-serif;
+    --font-body: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Georgia', 'Times New Roman', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    --sidebar-background: 96 18% 16%;
+    --sidebar-foreground: 38 30% 88%;
+    --sidebar-primary: 38 44% 96%;
+    --sidebar-primary-foreground: 96 22% 26%;
+    --sidebar-accent: 96 14% 22%;
+    --sidebar-accent-foreground: 38 44% 96%;
+    --sidebar-border: 96 12% 28%;
+    --sidebar-ring: 24 52% 52%;
+  }
+
+  .dark {
+    --background: 24 15% 10%;
+    --foreground: 38 30% 90%;
+    --card: 24 15% 14%;
+    --card-foreground: 38 30% 90%;
+    --popover: 24 15% 14%;
+    --popover-foreground: 38 30% 90%;
+    --primary: 96 22% 40%;
+    --primary-foreground: 38 44% 96%;
+    --secondary: 24 12% 18%;
+    --secondary-foreground: 38 30% 90%;
+    --muted: 24 12% 16%;
+    --muted-foreground: 38 10% 62%;
+    --accent: 24 52% 58%;
+    --accent-foreground: 24 15% 10%;
+    --destructive: 0 63% 48%;
+    --destructive-foreground: 38 44% 96%;
+    --border: 24 12% 22%;
+    --input: 24 12% 22%;
+    --ring: 96 22% 40%;
+    --chart-1: 96 22% 40%;
+    --chart-2: 24 52% 58%;
+    --chart-3: 42 60% 55%;
+    --chart-4: 200 35% 55%;
+    --chart-5: 340 45% 60%;
+    --sidebar-background: 24 15% 9%;
+    --sidebar-foreground: 38 20% 80%;
+    --sidebar-primary: 38 44% 96%;
+    --sidebar-primary-foreground: 96 22% 26%;
+    --sidebar-accent: 24 12% 16%;
+    --sidebar-accent-foreground: 38 44% 96%;
+    --sidebar-border: 24 12% 18%;
+    --sidebar-ring: 24 52% 58%;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light) {
+      --background: 24 15% 10%;
+      --foreground: 38 30% 90%;
+      --card: 24 15% 14%;
+      --card-foreground: 38 30% 90%;
+      --popover: 24 15% 14%;
+      --popover-foreground: 38 30% 90%;
+      --primary: 96 22% 40%;
+      --primary-foreground: 38 44% 96%;
+      --secondary: 24 12% 18%;
+      --secondary-foreground: 38 30% 90%;
+      --muted: 24 12% 16%;
+      --muted-foreground: 38 10% 62%;
+      --accent: 24 52% 58%;
+      --accent-foreground: 24 15% 10%;
+      --destructive: 0 63% 48%;
+      --destructive-foreground: 38 44% 96%;
+      --border: 24 12% 22%;
+      --input: 24 12% 22%;
+      --ring: 96 22% 40%;
+      --chart-1: 96 22% 40%;
+      --chart-2: 24 52% 58%;
+      --chart-3: 42 60% 55%;
+      --chart-4: 200 35% 55%;
+      --chart-5: 340 45% 60%;
+      --sidebar-background: 24 15% 9%;
+      --sidebar-foreground: 38 20% 80%;
+      --sidebar-primary: 38 44% 96%;
+      --sidebar-primary-foreground: 96 22% 26%;
+      --sidebar-accent: 24 12% 16%;
+      --sidebar-accent-foreground: 38 44% 96%;
+      --sidebar-border: 24 12% 18%;
+      --sidebar-ring: 24 52% 58%;
+    }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html, body, #root {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+    overscroll-behavior-y: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: manipulation;
+  }
+
+  button, a, [role="tab"], table {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-heading tracking-tight;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 3px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+}
+
+@media print {
+  html, body, #root {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  #main-scroll {
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    inset: auto !important;
+    display: block !important;
+  }
+
+  .fixed {
+    display: none !important;
+  }
+
+  .overflow-x-auto, .overflow-y-auto, .overflow-hidden, .overflow-auto {
+    overflow: visible !important;
+  }
+}
