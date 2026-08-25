@@ -11,15 +11,24 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
-    const [productos, menus, eventos] = await Promise.all([
-      base44.entities.Producto.list('-updated_date', 500),
-      base44.entities.Menu.list('-updated_date', 200),
-      base44.entities.Evento.list('-fecha', 100),
-    ]);
-    const hoy = new Date().toISOString().split('T')[0];
-    const proximos = eventos.filter(e => e.fecha >= hoy && e.estado !== 'cancelado').slice(0, 5);
-    setStats({ productos: productos.length, menus: menus.length, eventos: eventos.length, proximosEventos: proximos });
-    setLoading(false);
+    setLoading(true);
+    try {
+      const [productos, menus, eventos] = await Promise.all([
+        base44.entities.Producto.list('-updated_date', 500),
+        base44.entities.Menu.list('-updated_date', 200),
+        base44.entities.Evento.list('-fecha', 100),
+      ]);
+      const prods = productos || [];
+      const ms = menus || [];
+      const evs = eventos || [];
+      const hoy = new Date().toISOString().split('T')[0];
+      const proximos = evs.filter(e => e.fecha >= hoy && e.estado !== 'cancelado').slice(0, 5);
+      setStats({ productos: prods.length, menus: ms.length, eventos: evs.length, proximosEventos: proximos });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);

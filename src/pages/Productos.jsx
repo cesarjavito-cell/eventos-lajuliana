@@ -24,13 +24,18 @@ export default function Productos() {
 
   const load = async () => {
     setLoading(true);
-    const [data, cats] = await Promise.all([
-      base44.entities.Producto.list('-updated_date', 500),
-      base44.entities.Categoria.list('orden', 200),
-    ]);
-    setProductos(data);
-    setCategorias(cats.map(c => c.nombre));
-    setLoading(false);
+    try {
+      const [data, cats] = await Promise.all([
+        base44.entities.Producto.list('-updated_date', 500),
+        base44.entities.Categoria.list('orden', 200),
+      ]);
+      setProductos(data || []);
+      setCategorias((cats || []).map(c => c.nombre));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);

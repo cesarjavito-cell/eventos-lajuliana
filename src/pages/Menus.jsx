@@ -18,13 +18,18 @@ export default function Menus() {
 
   const load = async () => {
     setLoading(true);
-    const [m, p] = await Promise.all([
-      base44.entities.Menu.list('-updated_date', 200),
-      base44.entities.Producto.list('-updated_date', 500),
-    ]);
-    setMenus(m);
-    setProductos(p);
-    setLoading(false);
+    try {
+      const [m, p] = await Promise.all([
+        base44.entities.Menu.list('-updated_date', 200),
+        base44.entities.Producto.list('-updated_date', 500),
+      ]);
+      setMenus(m || []);
+      setProductos(p || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);

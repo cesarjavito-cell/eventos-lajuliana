@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
-import { User, Trash2, Moon, Smartphone } from 'lucide-react';
+import { User, Trash2, Moon, Smartphone, Database, Download, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function Ajustes() {
@@ -62,6 +62,53 @@ export default function Ajustes() {
         <p className="text-sm text-muted-foreground">
           Navegación inferior optimizada con áreas táctiles de 44px y soporte para safe-area en dispositivos con notch.
         </p>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+        <h2 className="font-heading font-semibold text-lg flex items-center gap-2">
+          <Database className="w-5 h-5" /> Copia de seguridad y datos
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Podés exportar una copia de seguridad con todos tus productos, menús y eventos o importar datos guardados en archivo JSON.
+        </p>
+        <div className="flex gap-3 flex-wrap pt-2">
+          <Button variant="outline" onClick={() => {
+            const data = base44.exportAllData();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `catering_juliana_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            toast.success('Copia de seguridad descargada');
+          }}>
+            <Download className="w-4 h-4 mr-2" /> Exportar Datos (.json)
+          </Button>
+          <label className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium border border-input rounded-md cursor-pointer bg-background hover:bg-accent hover:text-accent-foreground shadow-sm">
+            <Upload className="w-4 h-4 mr-2" /> Importar Datos
+            <input
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                  try {
+                    const data = JSON.parse(event.target.result);
+                    base44.importAllData(data);
+                    toast.success('Datos importados correctamente');
+                    setTimeout(() => window.location.reload(), 1000);
+                  } catch (err) {
+                    toast.error('El archivo JSON no es válido');
+                  }
+                };
+                reader.readAsText(file);
+              }}
+            />
+          </label>
+        </div>
       </div>
 
       <div className="rounded-xl border border-destructive/30 bg-card p-5 space-y-3">

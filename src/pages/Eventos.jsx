@@ -27,13 +27,18 @@ export default function Eventos() {
 
   const load = async () => {
     setLoading(true);
-    const [evs, ms] = await Promise.all([
-      base44.entities.Evento.list('-fecha', 100),
-      base44.entities.Menu.list('-updated_date', 200),
-    ]);
-    setEventos(evs);
-    setMenus(ms);
-    setLoading(false);
+    try {
+      const [evs, ms] = await Promise.all([
+        base44.entities.Evento.list('-fecha', 100),
+        base44.entities.Menu.list('-updated_date', 200),
+      ]);
+      setEventos(evs || []);
+      setMenus(ms || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);

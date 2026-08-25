@@ -19,23 +19,28 @@ export default function CalculoCompra() {
   const [hidePrices, setHidePrices] = useState(false);
 
   const load = async () => {
-    const [evs, ms, ps] = await Promise.all([
-      base44.entities.Evento.list('-fecha', 100),
-      base44.entities.Menu.list('-updated_date', 200),
-      base44.entities.Producto.list('-updated_date', 500),
-    ]);
-    setEventos(evs);
-    setMenus(ms);
-    setProductos(ps);
+    setLoading(true);
+    try {
+      const [evs, ms, ps] = await Promise.all([
+        base44.entities.Evento.list('-fecha', 100),
+        base44.entities.Menu.list('-updated_date', 200),
+        base44.entities.Producto.list('-updated_date', 500),
+      ]);
+      setEventos(evs || []);
+      setMenus(ms || []);
+      setProductos(ps || []);
 
-    if (!selectedId) {
-      const urlParams = new URLSearchParams(window.location.search);
-      const fromUrl = urlParams.get('evento');
-      if (fromUrl) setSelectedId(fromUrl);
-      else if (evs.length > 0) setSelectedId(evs[0].id);
+      if (!selectedId) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const fromUrl = urlParams.get('evento');
+        if (fromUrl) setSelectedId(fromUrl);
+        else if (evs && evs.length > 0) setSelectedId(evs[0].id);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
