@@ -38,7 +38,7 @@ export default function Layout() {
   };
 
   return (
-    <div id="main-scroll" className="fixed inset-0 flex items-start overflow-y-auto bg-background">
+    <div id="main-scroll" className="fixed inset-0 flex flex-col md:flex-row items-stretch overflow-y-auto bg-background w-full">
       {/* Mobile top bar */}
       <div
         className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-3 bg-sidebar md:hidden"
@@ -112,7 +112,7 @@ export default function Layout() {
 
       {/* Main content */}
       <main
-        className="flex-1 p-6 md:p-10 pt-20 md:pt-10 pb-24 md:pb-10"
+        className="flex-1 w-full min-w-0 p-4 sm:p-6 md:p-10 pt-16 sm:pt-20 md:pt-10 pb-24 md:pb-10"
       >
         <Outlet />
       </main>
