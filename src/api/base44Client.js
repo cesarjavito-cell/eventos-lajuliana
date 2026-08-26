@@ -1,3 +1,5 @@
+import { fetchCloudData, pushCloudData } from './cloudSync';
+
 // Seed data based on user's project
 const initialData = {
   Producto: [
@@ -78,7 +80,7 @@ const getLocalEntityData = (entityName) => {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed)) return parsed;
     } catch {
-      // fallback to initial if corrupted
+      // fallback to initial
     }
   }
   const init = initialData[entityName] || [];
@@ -96,6 +98,16 @@ const setLocalEntityData = (entityName, data) => {
   } catch { /* ignore */ }
 };
 
+const notifyCloudSync = () => {
+  const currentData = {
+    productos: getLocalEntityData('Producto'),
+    categorias: getLocalEntityData('Categoria'),
+    menus: getLocalEntityData('Menu'),
+    eventos: getLocalEntityData('Evento'),
+  };
+  pushCloudData(currentData);
+};
+
 const createLocalEntityHandler = (entityName) => ({
   list: async () => {
     return getLocalEntityData(entityName);
@@ -105,6 +117,7 @@ const createLocalEntityHandler = (entityName) => ({
     const newItem = { id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`, updated_date: new Date().toISOString(), ...item };
     list.unshift(newItem);
     setLocalEntityData(entityName, list);
+    notifyCloudSync();
     return newItem;
   },
   update: async (id, patch) => {
@@ -113,6 +126,7 @@ const createLocalEntityHandler = (entityName) => ({
     if (idx !== -1) {
       list[idx] = { ...list[idx], ...patch, updated_date: new Date().toISOString() };
       setLocalEntityData(entityName, list);
+      notifyCloudSync();
     }
     return list[idx];
   },
@@ -120,6 +134,7 @@ const createLocalEntityHandler = (entityName) => ({
     let list = getLocalEntityData(entityName);
     list = list.filter(x => x.id !== id);
     setLocalEntityData(entityName, list);
+    notifyCloudSync();
     return true;
   },
   updateMany: async (filter, updateOp) => {
@@ -136,10 +151,36 @@ const createLocalEntityHandler = (entityName) => ({
         changed = true;
       }
     });
-    if (changed) setLocalEntityData(entityName, list);
+    if (changed) {
+      setLocalEntityData(entityName, list);
+      notifyCloudSync();
+    }
     return true;
   }
 });
+
+// Auto-sync in background across devices
+if (typeof window !== 'undefined') {
+  const syncFromCloud = async () => {
+    const cloud = await fetchCloudData();
+    if (cloud) {
+      let updated = false;
+      if (cloud.productos) { setLocalEntityData('Producto', cloud.productos); updated = true; }
+      if (cloud.categorias) { setLocalEntityData('Categoria', cloud.categorias); updated = true; }
+      if (cloud.menus) { setLocalEntityData('Menu', cloud.menus); updated = true; }
+      if (cloud.eventos) { setLocalEntityData('Evento', cloud.eventos); updated = true; }
+    }
+  };
+
+  // Initial cloud sync on load
+  syncFromCloud();
+
+  // Periodic poll every 6 seconds for live device sync
+  setInterval(syncFromCloud, 6000);
+
+  // Sync on window focus
+  window.addEventListener('focus', syncFromCloud);
+}
 
 export const base44 = {
   functions: {
@@ -156,12 +197,14 @@ export const base44 = {
     setLocalEntityData('Categoria', initialData.Categoria);
     setLocalEntityData('Menu', []);
     setLocalEntityData('Evento', []);
+    notifyCloudSync();
   },
   resetFactoryData: () => {
     setLocalEntityData('Producto', initialData.Producto);
     setLocalEntityData('Categoria', initialData.Categoria);
     setLocalEntityData('Menu', initialData.Menu);
     setLocalEntityData('Evento', initialData.Evento);
+    notifyCloudSync();
   },
   exportAllData: () => {
     return {
@@ -177,5 +220,6 @@ export const base44 = {
     if (data.categorias) setLocalEntityData('Categoria', data.categorias);
     if (data.menus) setLocalEntityData('Menu', data.menus);
     if (data.eventos) setLocalEntityData('Evento', data.eventos);
+    notifyCloudSync();
   }
 };
