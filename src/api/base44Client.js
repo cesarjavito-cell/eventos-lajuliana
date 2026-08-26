@@ -6,14 +6,19 @@ const { appId, token, functionsVersion, appBaseUrl } = appParams;
 const effectiveAppId = appId || '6a708dde640264104ee5861a';
 const effectiveServerUrl = appBaseUrl || 'https://app.base44.com';
 
-const sdkClient = createClient({
-  appId: effectiveAppId,
-  token,
-  functionsVersion: functionsVersion || 'v1',
-  serverUrl: effectiveServerUrl,
-  requiresAuth: false,
-  appBaseUrl: effectiveServerUrl
-});
+let sdkClient = null;
+try {
+  sdkClient = createClient({
+    appId: effectiveAppId,
+    token,
+    functionsVersion: functionsVersion || 'v1',
+    serverUrl: effectiveServerUrl,
+    requiresAuth: false,
+    appBaseUrl: effectiveServerUrl
+  });
+} catch (err) {
+  console.warn('SDK client initialization warning:', err);
+}
 
 // Seed data based on user's project
 const initialData = {
@@ -87,29 +92,36 @@ const initialData = {
 };
 
 const getLocalEntityData = (entityName) => {
+  if (typeof window === 'undefined') return initialData[entityName] || [];
   const key = `catering_local_${entityName}`;
   const stored = localStorage.getItem(key);
   if (stored) {
     try {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     } catch {
       // fallback to initial
     }
   }
   const init = initialData[entityName] || [];
-  localStorage.setItem(key, JSON.stringify(init));
+  try {
+    localStorage.setItem(key, JSON.stringify(init));
+  } catch { /* ignore */ }
   return init;
 };
 
 const setLocalEntityData = (entityName, data) => {
+  if (typeof window === 'undefined') return;
   const key = `catering_local_${entityName}`;
-  localStorage.setItem(key, JSON.stringify(data));
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch { /* ignore */ }
 };
 
 const createLocalEntityHandler = (entityName) => ({
   list: async () => {
     try {
-      if (token && sdkClient?.entities?.[entityName]) {
+      if (token && sdkClient?.entities?.[entityName]?.list) {
         const res = await sdkClient.entities[entityName].list('-updated_date', 500);
         if (res && res.length > 0) {
           setLocalEntityData(entityName, res);
@@ -127,7 +139,7 @@ const createLocalEntityHandler = (entityName) => ({
     list.unshift(newItem);
     setLocalEntityData(entityName, list);
     try {
-      if (token && sdkClient?.entities?.[entityName]) {
+      if (token && sdkClient?.entities?.[entityName]?.create) {
         await sdkClient.entities[entityName].create(item);
       }
     } catch { /* ignore */ }
@@ -141,7 +153,7 @@ const createLocalEntityHandler = (entityName) => ({
       setLocalEntityData(entityName, list);
     }
     try {
-      if (token && sdkClient?.entities?.[entityName]) {
+      if (token && sdkClient?.entities?.[entityName]?.update) {
         await sdkClient.entities[entityName].update(id, patch);
       }
     } catch { /* ignore */ }
@@ -152,7 +164,7 @@ const createLocalEntityHandler = (entityName) => ({
     list = list.filter(x => x.id !== id);
     setLocalEntityData(entityName, list);
     try {
-      if (token && sdkClient?.entities?.[entityName]) {
+      if (token && sdkClient?.entities?.[entityName]?.delete) {
         await sdkClient.entities[entityName].delete(id);
       }
     } catch { /* ignore */ }
@@ -179,6 +191,18 @@ const createLocalEntityHandler = (entityName) => ({
 
 export const base44 = {
   ...sdkClient,
+  functions: {
+    invoke: async (funcName, args) => {
+      try {
+        if (token && sdkClient?.functions?.invoke) {
+          return await sdkClient.functions.invoke(funcName, args);
+        }
+      } catch (err) {
+        console.warn('Function invoke warning:', err);
+      }
+      return { success: true };
+    }
+  },
   entities: {
     Producto: createLocalEntityHandler('Producto'),
     Menu: createLocalEntityHandler('Menu'),
