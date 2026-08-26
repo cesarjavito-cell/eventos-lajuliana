@@ -88,7 +88,7 @@ export default function Ajustes() {
             <Upload className="w-4 h-4 mr-2" /> Importar Datos
             <input
               type="file"
-              accept=".json"
+              accept="*/*"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
