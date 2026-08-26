@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { ShoppingCart, Users, CalendarDays, UtensilsCrossed, TrendingUp, Package, Printer, ChevronDown, ChevronRight, EyeOff, Eye } from 'lucide-react';
+import { ShoppingCart, Users, CalendarDays, UtensilsCrossed, TrendingUp, Package, Printer, ChevronDown, ChevronRight, EyeOff, Eye, RotateCcw, CheckCircle2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatPrice, formatNumber, formatDateLong } from '@/lib/format';
 import PullToRefresh from '@/components/PullToRefresh';
@@ -17,6 +17,10 @@ export default function CalculoCompra() {
   const [loading, setLoading] = useState(false);
   const [expandedCats, setExpandedCats] = useState({});
   const [hidePrices, setHidePrices] = useState(false);
+
+  // Checked and custom quantity states per event
+  const [checkedMap, setCheckedMap] = useState({});
+  const [customQtyMap, setCustomQtyMap] = useState({});
 
   const load = async () => {
     setLoading(true);
@@ -48,6 +52,48 @@ export default function CalculoCompra() {
     window.addEventListener('catering-cloud-updated', load);
     return () => window.removeEventListener('catering-cloud-updated', load);
   }, []);
+
+  // Load event-specific check & qty overrides from localStorage
+  useEffect(() => {
+    if (selectedId) {
+      try {
+        const storedCheck = localStorage.getItem(`catering_calc_check_${selectedId}`);
+        const storedQty = localStorage.getItem(`catering_calc_qty_${selectedId}`);
+        setCheckedMap(storedCheck ? JSON.parse(storedCheck) : {});
+        setCustomQtyMap(storedQty ? JSON.parse(storedQty) : {});
+      } catch {
+        setCheckedMap({});
+        setCustomQtyMap({});
+      }
+    }
+  }, [selectedId]);
+
+  const toggleCheck = (producto_id) => {
+    const updated = { ...checkedMap, [producto_id]: !checkedMap[producto_id] };
+    setCheckedMap(updated);
+    if (selectedId) {
+      try { localStorage.setItem(`catering_calc_check_${selectedId}`, JSON.stringify(updated)); } catch {}
+    }
+  };
+
+  const handleCustomQtyChange = (producto_id, val) => {
+    const updated = { ...customQtyMap, [producto_id]: val };
+    setCustomQtyMap(updated);
+    if (selectedId) {
+      try { localStorage.setItem(`catering_calc_qty_${selectedId}`, JSON.stringify(updated)); } catch {}
+    }
+  };
+
+  const resetAllChecks = () => {
+    setCheckedMap({});
+    setCustomQtyMap({});
+    if (selectedId) {
+      try {
+        localStorage.removeItem(`catering_calc_check_${selectedId}`);
+        localStorage.removeItem(`catering_calc_qty_${selectedId}`);
+      } catch {}
+    }
+  };
 
   const selectedEvento = eventos.find(e => e.id === selectedId);
 
@@ -82,11 +128,22 @@ export default function CalculoCompra() {
       const product = productMap.get(item.producto_id);
       const precio = product?.precio_actual || 0;
       const cantidad_total = item.cantidad_por_persona * comensales;
+
+      const isChecked = !!checkedMap[item.producto_id];
+      const customQtyRaw = customQtyMap[item.producto_id];
+      const qtyToBuy = (customQtyRaw !== undefined && customQtyRaw !== '')
+        ? Math.max(0, parseFloat(customQtyRaw) || 0)
+        : cantidad_total;
+
+      const rowCost = isChecked ? 0 : (qtyToBuy * precio);
+
       return {
         ...item,
         precio_actual: precio,
         cantidad_total,
-        costo_total: cantidad_total * precio,
+        qtyToBuy,
+        isChecked,
+        rowCost,
       };
     });
 
@@ -98,11 +155,12 @@ export default function CalculoCompra() {
       grouped[item.categoria].push(item);
     }
 
-    const costoTotal = items.reduce((s, i) => s + i.costo_total, 0);
+    const costoTotal = items.reduce((s, i) => s + i.rowCost, 0);
     const costoPorPersona = comensales > 0 ? costoTotal / comensales : 0;
+    const checkedCount = items.filter(i => i.isChecked).length;
 
-    return { items, grouped, costoTotal, costoPorPersona, eventMenus, comensales };
-  }, [selectedEvento, menus, productos]);
+    return { items, grouped, costoTotal, costoPorPersona, eventMenus, comensales, checkedCount };
+  }, [selectedEvento, menus, productos, checkedMap, customQtyMap]);
 
   const toggleCat = (cat) => setExpandedCats(prev => ({ ...prev, [cat]: !prev[cat] }));
 
@@ -131,7 +189,7 @@ export default function CalculoCompra() {
       <div className="flex items-center justify-between flex-wrap gap-4 print:hidden">
         <div>
           <h1 className="text-3xl font-heading font-semibold">Cálculo de Compra</h1>
-          <p className="text-muted-foreground mt-1">Lista de insumos totales y costos del evento</p>
+          <p className="text-muted-foreground mt-1">Lista de insumos totales, stock disponible y costos del evento</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           {calc && (
@@ -241,10 +299,12 @@ export default function CalculoCompra() {
           {/* Cost summary */}
           {!hidePrices ? (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="rounded-xl bg-primary text-primary-foreground p-5">
+              <div className="rounded-xl bg-primary text-primary-foreground p-5 shadow-sm">
                 <TrendingUp className="w-5 h-5 opacity-80" />
                 <p className="text-3xl font-heading font-bold mt-2">{formatPrice(calc.costoTotal)}</p>
-                <p className="text-sm opacity-80">Costo total de compra</p>
+                <p className="text-sm opacity-80">
+                  {calc.checkedCount > 0 ? 'Costo a comprar (con tachados)' : 'Costo total de compra'}
+                </p>
               </div>
               <div className="rounded-xl border border-border bg-card p-5">
                 <Users className="w-5 h-5 text-muted-foreground" />
@@ -253,8 +313,15 @@ export default function CalculoCompra() {
               </div>
               <div className="rounded-xl border border-border bg-card p-5">
                 <Package className="w-5 h-5 text-muted-foreground" />
-                <p className="text-3xl font-heading font-bold mt-2">{calc.items.length}</p>
-                <p className="text-sm text-muted-foreground">Productos a comprar</p>
+                <div className="flex items-baseline gap-2 mt-2">
+                  <p className="text-3xl font-heading font-bold">{calc.items.length - calc.checkedCount}</p>
+                  {calc.checkedCount > 0 && (
+                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                      ({calc.checkedCount} en depósito)
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">Productos pendientes a comprar</p>
               </div>
             </div>
           ) : (
@@ -276,13 +343,25 @@ export default function CalculoCompra() {
             </div>
           ) : (
             <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <div className="px-5 py-3 border-b border-border bg-muted/30">
-                <h3 className="font-heading font-semibold">Lista de Compra</h3>
+              <div className="px-5 py-3 border-b border-border bg-muted/30 flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <h3 className="font-heading font-semibold">Lista de Compra y Control de Depósito</h3>
+                  <p className="text-xs text-muted-foreground">Tildá los productos que ya tenés o ajustá la cantidad si tenés stock parcial.</p>
+                </div>
+                {(calc.checkedCount > 0 || Object.keys(customQtyMap).length > 0) && (
+                  <button
+                    type="button"
+                    onClick={resetAllChecks}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline font-medium print:hidden"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" /> Restablecer tachados y stock
+                  </button>
+                )}
               </div>
               <div className="divide-y divide-border">
                 {Object.entries(calc.grouped).map(([categoria, items]) => {
                   const expanded = expandedCats[categoria] !== false;
-                  const catTotal = items.reduce((s, i) => s + i.costo_total, 0);
+                  const catTotal = items.reduce((s, i) => s + i.rowCost, 0);
                   return (
                     <div key={categoria}>
                       <button
@@ -290,52 +369,125 @@ export default function CalculoCompra() {
                         className="flex items-center justify-between w-full px-3 py-2 bg-rose-50/90 hover:bg-rose-100/90 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 transition-colors border-b border-rose-200/60 dark:border-rose-900/40 select-none"
                       >
                         <div className="flex items-center gap-2">
-                           {expanded ? <ChevronDown className="w-4 h-4 text-rose-700 dark:text-rose-300" /> : <ChevronRight className="w-4 h-4 text-rose-700 dark:text-rose-300" />}
-                           <span className="font-semibold text-rose-900 dark:text-rose-100 text-sm sm:text-base">{categoria}</span>
-                           <span className="text-xs text-rose-700/80 dark:text-rose-300">({items.length} ítem{items.length !== 1 ? 's' : ''})</span>
-                         </div>
-                         {!hidePrices && <span className="text-xs sm:text-sm font-semibold text-rose-900 dark:text-rose-200">{formatPrice(catTotal)}</span>}
+                          {expanded ? <ChevronDown className="w-4 h-4 text-rose-700 dark:text-rose-300" /> : <ChevronRight className="w-4 h-4 text-rose-700 dark:text-rose-300" />}
+                          <span className="font-semibold text-rose-900 dark:text-rose-100 text-sm sm:text-base">{categoria}</span>
+                          <span className="text-xs text-rose-700/80 dark:text-rose-300">({items.length} ítem{items.length !== 1 ? 's' : ''})</span>
+                        </div>
+                        {!hidePrices && <span className="text-xs sm:text-sm font-semibold text-rose-900 dark:text-rose-200">{formatPrice(catTotal)}</span>}
                       </button>
-                        <div className={`overflow-x-auto ${expanded ? '' : 'hidden print:block'}`}>
-                          <table className="w-full text-xs sm:text-sm">
-                            <thead>
-                              <tr className="border-b border-border bg-muted/20 text-muted-foreground text-[11px] uppercase tracking-wider">
-                                <th className="text-left font-medium px-3 py-1.5">Producto</th>
-                                <th className="text-right font-medium px-3 py-1.5">Cant. Total</th>
-                                {!hidePrices && <th className="text-right font-medium px-3 py-1.5">Precio unit.</th>}
-                                {!hidePrices && <th className="text-right font-medium px-3 py-1.5">Costo total</th>}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {items.map(item => (
-                                <tr key={item.producto_id} className="border-b border-border/60 last:border-0 hover:bg-muted/20 transition-colors">
-                                  <td className="px-3 py-1.5">
-                                    <p className="font-medium text-foreground leading-snug">{item.producto_nombre}</p>
+                      <div className={`overflow-x-auto ${expanded ? '' : 'hidden print:block'}`}>
+                        <table className="w-full text-xs sm:text-sm">
+                          <thead>
+                            <tr className="border-b border-border bg-muted/20 text-muted-foreground text-[11px] uppercase tracking-wider">
+                              <th className="px-3 py-2 text-center w-10 print:hidden">Estado</th>
+                              <th className="text-left font-medium px-3 py-2">Producto</th>
+                              <th className="text-right font-medium px-3 py-2">Cant. Recetada</th>
+                              <th className="text-right font-medium px-3 py-2">Cant. A Comprar</th>
+                              {!hidePrices && <th className="text-right font-medium px-3 py-2">Precio unit.</th>}
+                              {!hidePrices && <th className="text-right font-medium px-3 py-2">Costo total</th>}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {items.map(item => {
+                              const isChecked = item.isChecked;
+                              const hasPartialStock = !isChecked && item.qtyToBuy < item.cantidad_total;
+                              return (
+                                <tr
+                                  key={item.producto_id}
+                                  className={`border-b border-border/60 last:border-0 transition-colors ${
+                                    isChecked
+                                      ? 'bg-muted/30 opacity-70'
+                                      : hasPartialStock
+                                      ? 'bg-amber-50/30 dark:bg-amber-950/20 hover:bg-amber-50/50'
+                                      : 'hover:bg-muted/20'
+                                  }`}
+                                >
+                                  {/* Checkbox button */}
+                                  <td className="px-3 py-2 text-center w-10 print:hidden">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => toggleCheck(item.producto_id)}
+                                      className="w-4 h-4 rounded border-input accent-emerald-600 cursor-pointer"
+                                      title="Marcar si ya está en depósito / comprado"
+                                    />
+                                  </td>
+
+                                  {/* Producto Nombre y Menús */}
+                                  <td className="px-3 py-2">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <p className={`font-medium leading-snug ${isChecked ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                                        {item.producto_nombre}
+                                      </p>
+                                      {isChecked && (
+                                        <span className="inline-flex items-center gap-0.5 text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-semibold px-2 py-0.5 rounded">
+                                          <CheckCircle2 className="w-3 h-3" /> En depósito
+                                        </span>
+                                      )}
+                                    </div>
                                     <p className="text-[11px] text-muted-foreground leading-none mt-0.5">{item.menu_nombres.join(', ')}</p>
                                   </td>
-                                  <td className="px-3 py-1.5 text-right font-semibold text-foreground whitespace-nowrap">
-                                     {formatNumber(item.cantidad_total, 3)} {item.unidad}
-                                   </td>
-                                   {!hidePrices && <td className="px-3 py-1.5 text-right text-muted-foreground whitespace-nowrap">
-                                     {formatPrice(item.precio_actual)}
-                                   </td>}
-                                   {!hidePrices && <td className="px-3 py-1.5 text-right font-bold text-foreground whitespace-nowrap">
-                                     {formatPrice(item.costo_total)}
-                                   </td>}
+
+                                  {/* Cant. Recetada / Necesaria */}
+                                  <td className={`px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap text-xs ${isChecked ? 'line-through' : ''}`}>
+                                    {formatNumber(item.cantidad_total, 3)} {item.unidad}
+                                  </td>
+
+                                  {/* Cant. A Comprar (Editable) */}
+                                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                                    <div className="inline-flex items-center justify-end gap-1">
+                                      <input
+                                        type="number"
+                                        step="0.001"
+                                        min="0"
+                                        disabled={isChecked}
+                                        value={customQtyMap[item.producto_id] !== undefined ? customQtyMap[item.producto_id] : item.cantidad_total}
+                                        onChange={(e) => handleCustomQtyChange(item.producto_id, e.target.value)}
+                                        className={`w-20 h-7 text-right font-bold text-xs border rounded px-1.5 transition-colors ${
+                                          isChecked
+                                            ? 'bg-muted text-muted-foreground line-through border-transparent'
+                                            : hasPartialStock
+                                            ? 'border-amber-500 bg-amber-50 dark:bg-amber-950 text-amber-900 dark:text-amber-100 font-extrabold'
+                                            : 'bg-background border-input text-foreground'
+                                        }`}
+                                      />
+                                      <span className="text-xs text-muted-foreground">{item.unidad}</span>
+                                    </div>
+                                    {hasPartialStock && (
+                                      <p className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold text-right mt-0.5">
+                                        (Stock en depósito: {formatNumber(item.cantidad_total - item.qtyToBuy, 2)} {item.unidad})
+                                      </p>
+                                    )}
+                                  </td>
+
+                                  {/* Precio unit. */}
+                                  {!hidePrices && (
+                                    <td className={`px-3 py-2 text-right text-muted-foreground whitespace-nowrap ${isChecked ? 'line-through' : ''}`}>
+                                      {formatPrice(item.precio_actual)}
+                                    </td>
+                                  )}
+
+                                  {/* Costo total */}
+                                  {!hidePrices && (
+                                    <td className={`px-3 py-2 text-right font-bold whitespace-nowrap ${isChecked ? 'line-through text-muted-foreground' : 'text-primary'}`}>
+                                      {formatPrice(item.rowCost)}
+                                    </td>
+                                  )}
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   );
                 })}
               </div>
               {!hidePrices && (
-              <div className="flex items-center justify-between px-5 py-4 bg-primary/5 border-t border-border">
-                <span className="font-heading font-bold text-lg">Total general</span>
-                <span className="font-heading font-bold text-lg text-primary">{formatPrice(calc.costoTotal)}</span>
-              </div>
+                <div className="flex items-center justify-between px-5 py-4 bg-primary/5 border-t border-border">
+                  <span className="font-heading font-bold text-lg">Total a comprar</span>
+                  <span className="font-heading font-bold text-lg text-primary">{formatPrice(calc.costoTotal)}</span>
+                </div>
               )}
             </div>
           )}
