@@ -1,0 +1,17 @@
+{
+  "name": "La Juliana - Gestión de Catering",
+  "short_name": "La Juliana",
+  "description": "Aplicación de Gestión de Catering y Eventos para La Juliana",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#263824",
+  "theme_color": "#263824",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
