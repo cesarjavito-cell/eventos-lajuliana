@@ -1,25 +1,3 @@
-import { createClient } from '@base44/sdk';
-import { appParams } from '@/lib/app-params';
-
-const { appId, token, functionsVersion, appBaseUrl } = appParams;
-
-const effectiveAppId = appId || '6a708dde640264104ee5861a';
-const effectiveServerUrl = appBaseUrl || 'https://app.base44.com';
-
-let sdkClient = null;
-try {
-  sdkClient = createClient({
-    appId: effectiveAppId,
-    token,
-    functionsVersion: functionsVersion || 'v1',
-    serverUrl: effectiveServerUrl,
-    requiresAuth: false,
-    appBaseUrl: effectiveServerUrl
-  });
-} catch (err) {
-  console.warn('SDK client initialization warning:', err);
-}
-
 // Seed data based on user's project
 const initialData = {
   Producto: [
@@ -120,17 +98,6 @@ const setLocalEntityData = (entityName, data) => {
 
 const createLocalEntityHandler = (entityName) => ({
   list: async () => {
-    try {
-      if (token && sdkClient?.entities?.[entityName]?.list) {
-        const res = await sdkClient.entities[entityName].list('-updated_date', 500);
-        if (res && res.length > 0) {
-          setLocalEntityData(entityName, res);
-          return res;
-        }
-      }
-    } catch {
-      // ignore network errors and use local storage
-    }
     return getLocalEntityData(entityName);
   },
   create: async (item) => {
@@ -138,11 +105,6 @@ const createLocalEntityHandler = (entityName) => ({
     const newItem = { id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`, updated_date: new Date().toISOString(), ...item };
     list.unshift(newItem);
     setLocalEntityData(entityName, list);
-    try {
-      if (token && sdkClient?.entities?.[entityName]?.create) {
-        await sdkClient.entities[entityName].create(item);
-      }
-    } catch { /* ignore */ }
     return newItem;
   },
   update: async (id, patch) => {
@@ -152,22 +114,12 @@ const createLocalEntityHandler = (entityName) => ({
       list[idx] = { ...list[idx], ...patch, updated_date: new Date().toISOString() };
       setLocalEntityData(entityName, list);
     }
-    try {
-      if (token && sdkClient?.entities?.[entityName]?.update) {
-        await sdkClient.entities[entityName].update(id, patch);
-      }
-    } catch { /* ignore */ }
     return list[idx];
   },
   delete: async (id) => {
     let list = getLocalEntityData(entityName);
     list = list.filter(x => x.id !== id);
     setLocalEntityData(entityName, list);
-    try {
-      if (token && sdkClient?.entities?.[entityName]?.delete) {
-        await sdkClient.entities[entityName].delete(id);
-      }
-    } catch { /* ignore */ }
     return true;
   },
   updateMany: async (filter, updateOp) => {
@@ -190,18 +142,8 @@ const createLocalEntityHandler = (entityName) => ({
 });
 
 export const base44 = {
-  ...sdkClient,
   functions: {
-    invoke: async (funcName, args) => {
-      try {
-        if (token && sdkClient?.functions?.invoke) {
-          return await sdkClient.functions.invoke(funcName, args);
-        }
-      } catch (err) {
-        console.warn('Function invoke warning:', err);
-      }
-      return { success: true };
-    }
+    invoke: async () => ({ success: true })
   },
   entities: {
     Producto: createLocalEntityHandler('Producto'),
