@@ -73,12 +73,12 @@ const getLocalEntityData = (entityName) => {
   if (typeof window === 'undefined') return initialData[entityName] || [];
   const key = `catering_local_${entityName}`;
   const stored = localStorage.getItem(key);
-  if (stored) {
+  if (stored !== null) {
     try {
       const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     } catch {
-      // fallback to initial
+      // fallback to initial if corrupted
     }
   }
   const init = initialData[entityName] || [];
@@ -150,6 +150,18 @@ export const base44 = {
     Menu: createLocalEntityHandler('Menu'),
     Evento: createLocalEntityHandler('Evento'),
     Categoria: createLocalEntityHandler('Categoria'),
+  },
+  clearAllData: () => {
+    setLocalEntityData('Producto', []);
+    setLocalEntityData('Categoria', initialData.Categoria);
+    setLocalEntityData('Menu', []);
+    setLocalEntityData('Evento', []);
+  },
+  resetFactoryData: () => {
+    setLocalEntityData('Producto', initialData.Producto);
+    setLocalEntityData('Categoria', initialData.Categoria);
+    setLocalEntityData('Menu', initialData.Menu);
+    setLocalEntityData('Evento', initialData.Evento);
   },
   exportAllData: () => {
     return {

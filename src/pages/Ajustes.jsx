@@ -108,6 +108,18 @@ export default function Ajustes() {
               }}
             />
           </label>
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (window.confirm('¿Querés borrar todos los datos para crear tus productos y menús desde cero?')) {
+                base44.clearAllData();
+                toast.success('Se vació la lista. Podés crear tus productos desde cero.');
+                setTimeout(() => window.location.reload(), 500);
+              }
+            }}
+          >
+            Vaciar todo para empezar de cero
+          </Button>
         </div>
       </div>
 
