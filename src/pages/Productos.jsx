@@ -141,21 +141,35 @@ export default function Productos() {
               </thead>
               <tbody>
                 {filtered.map(p => (
-                  <tr key={p.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                  <tr
+                    key={p.id}
+                    className="border-b border-border last:border-0 hover:bg-muted/40 transition-colors cursor-pointer"
+                    onClick={() => openEdit(p)}
+                  >
                     <td className="px-4 py-3 font-medium">{p.nombre}</td>
                     <td className="px-4 py-3">
-                      <span className="inline-block px-2 py-0.5 rounded-md bg-muted text-xs text-muted-foreground">{p.categoria}</span>
+                      <span className="inline-block px-2 py-0.5 rounded-md bg-muted text-xs font-medium text-foreground">{p.categoria}</span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{p.unidad}</td>
-                    <td className="px-4 py-3 text-right font-medium">{formatPrice(p.precio_actual)}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-primary">{formatPrice(p.precio_actual)}</td>
                     <td className="px-4 py-3 text-muted-foreground">{p.proveedor || '-'}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1 justify-end">
-                        <button onClick={() => openEdit(p)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground">
-                          <Pencil className="w-4 h-4" />
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(p)}
+                          title="Editar producto"
+                          className="min-w-[40px] h-[36px] flex items-center justify-center rounded-lg bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all font-medium text-xs px-2"
+                        >
+                          <Pencil className="w-4 h-4 mr-1" /> Editar
                         </button>
-                        <button onClick={() => setDeleteTarget(p)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
-                          <Trash2 className="w-4 h-4" />
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(p)}
+                          title="Eliminar producto"
+                          className="min-w-[40px] h-[36px] flex items-center justify-center rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition-all font-medium text-xs px-2"
+                        >
+                          <Trash2 className="w-4 h-4 mr-1" /> Borrar
                         </button>
                       </div>
                     </td>

@@ -94,12 +94,22 @@ export default function Menus() {
                   <h3 className="font-heading font-semibold text-lg">{m.nombre}</h3>
                   {m.tipo && <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-accent/10 text-xs text-accent font-medium">{m.tipo}</span>}
                 </div>
-                <div className="flex gap-1">
-                  <button onClick={() => openEdit(m)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground">
-                    <Pencil className="w-4 h-4" />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openEdit(m)}
+                    title="Editar menú"
+                    className="min-w-[40px] h-[36px] flex items-center justify-center rounded-lg bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all font-medium text-xs px-2"
+                  >
+                    <Pencil className="w-4 h-4 mr-1" /> Editar
                   </button>
-                  <button onClick={() => setDeleteTarget(m)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
-                    <Trash2 className="w-4 h-4" />
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(m)}
+                    title="Eliminar menú"
+                    className="min-w-[40px] h-[36px] flex items-center justify-center rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition-all font-medium text-xs px-2"
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" /> Borrar
                   </button>
                 </div>
               </div>

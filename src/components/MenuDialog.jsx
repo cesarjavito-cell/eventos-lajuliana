@@ -46,6 +46,15 @@ export default function MenuDialog({ open, onOpenChange, menu, products, onSave 
     setNewItem({ producto_id: '', cantidad: '' });
   };
 
+  const updateItemQuantity = (index, val) => {
+    const newItems = [...formData.items];
+    newItems[index] = {
+      ...newItems[index],
+      cantidad_por_persona: parseFloat(val) || 0,
+    };
+    setFormData({ ...formData, items: newItems });
+  };
+
   const removeItem = (index) => {
     setFormData({ ...formData, items: formData.items.filter((_, i) => i !== index) });
   };
@@ -141,18 +150,27 @@ export default function MenuDialog({ open, onOpenChange, menu, products, onSave 
 
             {/* Items list */}
             {formData.items.length > 0 && (
-              <div className="space-y-1.5 mt-2">
+              <div className="space-y-2 mt-3">
                 {formData.items.map((item, i) => (
-                  <div key={i} className="flex items-center justify-between gap-2 rounded-md bg-card border border-border px-3 py-2 text-sm">
-                    <span className="font-medium">{item.producto_nombre}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-muted-foreground">
-                        {item.cantidad_por_persona} {item.unidad}/persona
-                      </span>
+                  <div key={i} className="flex items-center justify-between gap-2 rounded-lg bg-card border border-border px-3 py-2 text-sm shadow-sm">
+                    <span className="font-medium flex-1 text-xs sm:text-sm">{item.producto_nombre}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          value={item.cantidad_por_persona}
+                          onChange={(e) => updateItemQuantity(i, e.target.value)}
+                          className="w-20 h-8 text-right font-semibold text-xs bg-background px-2"
+                        />
+                        <span className="text-xs text-muted-foreground">{item.unidad}/persona</span>
+                      </div>
                       <button
                         type="button"
                         onClick={() => removeItem(i)}
-                        className="text-destructive hover:text-destructive/80"
+                        className="p-1.5 rounded-md text-destructive hover:bg-destructive/10 transition-colors"
+                        title="Quitar del menú"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
