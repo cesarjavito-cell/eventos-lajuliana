@@ -11,7 +11,7 @@ import PullToRefresh from '@/components/PullToRefresh';
 export default function Menus() {
   const [menus, setMenus] = useState([]);
   const [productos, setProductos] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const { isOpen: dialogOpen, id: dialogId, open: openDialog, close: closeDialog } = useUrlDialog('menu');
   const editing = dialogId ? menus.find(m => m.id === dialogId) : null;
   const [deleteTarget, setDeleteTarget] = useState(null);

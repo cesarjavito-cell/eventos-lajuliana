@@ -13,7 +13,7 @@ import PullToRefresh from '@/components/PullToRefresh';
 
 export default function Productos() {
   const [productos, setProductos] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const { isOpen: dialogOpen, id: dialogId, open: openDialog, close: closeDialog } = useUrlDialog('producto');
   const editing = dialogId ? productos.find(p => p.id === dialogId) : null;
   const [search, setSearch] = useState('');

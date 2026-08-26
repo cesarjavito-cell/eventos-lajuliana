@@ -8,7 +8,7 @@ import PullToRefresh from '@/components/PullToRefresh';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({ productos: 0, menus: 0, eventos: 0, proximosEventos: [] });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const load = async () => {
     setLoading(true);

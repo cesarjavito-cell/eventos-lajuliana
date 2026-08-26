@@ -14,7 +14,7 @@ export default function CalculoCompra() {
   const [menus, setMenus] = useState([]);
   const [productos, setProductos] = useState([]);
   const [selectedId, setSelectedId] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [expandedCats, setExpandedCats] = useState({});
   const [hidePrices, setHidePrices] = useState(false);
 

@@ -20,7 +20,7 @@ const estadoConfig = {
 export default function Eventos() {
   const [eventos, setEventos] = useState([]);
   const [menus, setMenus] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const { isOpen: dialogOpen, id: dialogId, open: openDialog, close: closeDialog } = useUrlDialog('evento');
   const editing = dialogId ? eventos.find(ev => ev.id === dialogId) : null;
   const [deleteTarget, setDeleteTarget] = useState(null);
