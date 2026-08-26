@@ -38,7 +38,11 @@ export default function Productos() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    window.addEventListener('catering-cloud-updated', load);
+    return () => window.removeEventListener('catering-cloud-updated', load);
+  }, []);
 
   const filtered = productos.filter(p => {
     const matchesSearch = p.nombre?.toLowerCase().includes(search.toLowerCase());

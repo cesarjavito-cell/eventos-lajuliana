@@ -32,7 +32,11 @@ export default function Menus() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    window.addEventListener('catering-cloud-updated', load);
+    return () => window.removeEventListener('catering-cloud-updated', load);
+  }, []);
 
   const handleSave = async (formData) => {
     try {

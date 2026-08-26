@@ -1,24 +1,22 @@
 // Cloud Sync Manager for La Juliana Catering
 // Synchronizes Productos, Categorias, Menus, Eventos in real-time across all devices (PC & Phone)
 
-const CLOUD_SYNC_KEY = 'catering_juliana_db_v1';
-const CLOUD_API_ENDPOINT = `https://kvdb.io/catering_juliana_secret_key_2026/${CLOUD_SYNC_KEY}`;
+const OBJECT_ID = 'ff8081819ff5b11001a03e3740ce2922';
+const API_URL = `https://api.restful-api.dev/objects/${OBJECT_ID}`;
 
-let lastSyncTimestamp = 0;
 let isSyncing = false;
 
-// Sync functions
 export const fetchCloudData = async () => {
   try {
-    const res = await fetch(CLOUD_API_ENDPOINT, { cache: 'no-store' });
+    const res = await fetch(API_URL, { cache: 'no-store' });
     if (res.ok) {
-      const data = await res.json();
-      if (data && typeof data === 'object') {
-        return data;
+      const json = await res.json();
+      if (json && json.data && typeof json.data === 'object') {
+        return json.data;
       }
     }
   } catch (err) {
-    // network or offline fallback
+    // network fallback
   }
   return null;
 };
@@ -27,12 +25,15 @@ export const pushCloudData = async (allData) => {
   if (isSyncing) return;
   isSyncing = true;
   try {
-    await fetch(CLOUD_API_ENDPOINT, {
-      method: 'POST',
+    await fetch(API_URL, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        ...allData,
-        _updatedAt: Date.now()
+        name: 'catering_juliana_database',
+        data: {
+          ...allData,
+          _updatedAt: Date.now()
+        }
       })
     });
   } catch (err) {

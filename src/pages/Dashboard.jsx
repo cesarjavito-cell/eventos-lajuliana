@@ -31,7 +31,11 @@ export default function Dashboard() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    window.addEventListener('catering-cloud-updated', load);
+    return () => window.removeEventListener('catering-cloud-updated', load);
+  }, []);
 
   if (loading) {
     return (

@@ -159,24 +159,27 @@ const createLocalEntityHandler = (entityName) => ({
   }
 });
 
-// Auto-sync in background across devices
+// Auto-sync in background across devices with CustomEvent dispatch
 if (typeof window !== 'undefined') {
+  let lastCloudTimestamp = 0;
+
   const syncFromCloud = async () => {
     const cloud = await fetchCloudData();
-    if (cloud) {
-      let updated = false;
-      if (cloud.productos) { setLocalEntityData('Producto', cloud.productos); updated = true; }
-      if (cloud.categorias) { setLocalEntityData('Categoria', cloud.categorias); updated = true; }
-      if (cloud.menus) { setLocalEntityData('Menu', cloud.menus); updated = true; }
-      if (cloud.eventos) { setLocalEntityData('Evento', cloud.eventos); updated = true; }
+    if (cloud && cloud._updatedAt && cloud._updatedAt !== lastCloudTimestamp) {
+      lastCloudTimestamp = cloud._updatedAt;
+      if (Array.isArray(cloud.productos)) setLocalEntityData('Producto', cloud.productos);
+      if (Array.isArray(cloud.categorias)) setLocalEntityData('Categoria', cloud.categorias);
+      if (Array.isArray(cloud.menus)) setLocalEntityData('Menu', cloud.menus);
+      if (Array.isArray(cloud.eventos)) setLocalEntityData('Evento', cloud.eventos);
+      window.dispatchEvent(new CustomEvent('catering-cloud-updated'));
     }
   };
 
   // Initial cloud sync on load
   syncFromCloud();
 
-  // Periodic poll every 6 seconds for live device sync
-  setInterval(syncFromCloud, 6000);
+  // Periodic poll every 4 seconds for live device sync
+  setInterval(syncFromCloud, 4000);
 
   // Sync on window focus
   window.addEventListener('focus', syncFromCloud);

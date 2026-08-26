@@ -43,7 +43,11 @@ export default function CalculoCompra() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    window.addEventListener('catering-cloud-updated', load);
+    return () => window.removeEventListener('catering-cloud-updated', load);
+  }, []);
 
   const selectedEvento = eventos.find(e => e.id === selectedId);
 
