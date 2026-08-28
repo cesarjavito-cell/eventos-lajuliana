@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Plus, Pencil, Trash2, Save, Download, Upload, Database } from 'lucide-react';
+import { Plus, Pencil, Trash2, Save, Download, Upload, Database, Cloud, CloudLightning } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,23 +10,39 @@ import { useToast } from '@/components/ui/use-toast';
 import { MEASUREMENT_LABELS, CATEGORY_LABELS, formatCurrency } from '@/lib/pricing';
 import { ensureSeedServices } from '@/lib/seedServices';
 import { exportBackupJSON, importBackupJSON } from '@/lib/localEntityStore';
+import { getStoredFirebaseConfig, saveFirebaseConfig } from '@/lib/firebaseConfig';
 import ServiceFormDialog from '@/components/settings/ServiceFormDialog';
 import CabinFormDialog from '@/components/settings/CabinFormDialog';
 import UserManagement from '@/components/settings/UserManagement';
 
 export default function Ajustes() {
   const { toast } = useToast();
-  const [services, setServices] = useState([]);
-  const [cabins, setCabins] = useState([]);
-  const [settings, setSettings] = useState(null);
-  const [settingsForm, setSettingsForm] = useState({ next_year_inflation: 0, following_year_inflation: 0, quinta_name: '', quinta_phone: '' });
-  const [loading, setLoading] = useState(true);
-  const [savingSettings, setSavingSettings] = useState(false);
+  const [firebaseForm, setFirebaseForm] = useState({
+    apiKey: '',
+    authDomain: '',
+    projectId: '',
+    storageBucket: '',
+    messagingSenderId: '',
+    appId: ''
+  });
 
-  const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
-  const [editingService, setEditingService] = useState(null);
-  const [cabinDialogOpen, setCabinDialogOpen] = useState(false);
-  const [editingCabin, setEditingCabin] = useState(null);
+  useEffect(() => {
+    const cfg = getStoredFirebaseConfig();
+    if (cfg) {
+      setFirebaseForm(cfg);
+    }
+  }, []);
+
+  const handleSaveFirebaseConfig = () => {
+    if (!firebaseForm.apiKey || !firebaseForm.projectId) {
+      toast({ title: 'Atención', description: 'Ingresa al menos el API Key y Project ID de tu proyecto Google Firebase.', variant: 'destructive' });
+      return;
+    }
+    const success = saveFirebaseConfig(firebaseForm);
+    if (success) {
+      toast({ title: '¡Conexión guardada con éxito!', description: 'Todos los dispositivos registrados comenzarán a sincronizar en tiempo real con Google Cloud.' });
+    }
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -145,6 +161,7 @@ export default function Ajustes() {
           <TabsTrigger value="cabins">Cabañas</TabsTrigger>
           <TabsTrigger value="users">Usuarios</TabsTrigger>
           <TabsTrigger value="backup">💾 Copia de Seguridad</TabsTrigger>
+          <TabsTrigger value="firebase">⚡ Sincronización Nube (Google)</TabsTrigger>
         </TabsList>
 
         <TabsContent value="services">
@@ -302,6 +319,69 @@ export default function Ajustes() {
                   <Upload className="w-4 h-4 mr-2" /> Cargar / Restaurar Archivo (.json)
                 </Button>
               </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="firebase">
+          <div className="bg-white rounded-xl border border-stone-200 p-6 space-y-6 max-w-2xl">
+            <div>
+              <div className="flex items-center gap-2">
+                <CloudLightning className="w-5 h-5 text-amber-500" />
+                <h2 className="font-semibold text-lg text-stone-800">Conexión con Google Cloud Firestore</h2>
+              </div>
+              <p className="text-sm text-stone-500 mt-1">
+                Conecta tu proyecto gratuito de Google Firebase para que todas las agendas, cobros y presupuestos se sincronicen en tiempo real entre todos los celulares de tu equipo.
+              </p>
+            </div>
+
+            {firebaseForm.apiKey && firebaseForm.projectId ? (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
+                <Badge className="bg-emerald-600 text-white">🟢 Conectado</Badge>
+                <p className="text-xs text-emerald-800 font-medium">
+                  Sincronización en tiempo real activa con el proyecto Google Cloud <code>{firebaseForm.projectId}</code>.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-800">
+                💡 <strong>¿Cómo obtener tu clave gratuita de Google Firebase?</strong><br />
+                1. Entra a <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer" className="underline font-semibold">console.firebase.google.com</a>.<br />
+                2. Crea un proyecto gratuito llamado <strong>Quinta La Juliana</strong>.<br />
+                3. Agrega una Web App, copia las claves de configuración y pégalas a continuación.
+              </div>
+            )}
+
+            <div className="space-y-4 pt-2">
+              <div>
+                <Label>API Key de Google Firebase</Label>
+                <Input
+                  placeholder="Ej: AIzaSyD..."
+                  value={firebaseForm.apiKey}
+                  onChange={(e) => setFirebaseForm((p) => ({ ...p, apiKey: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <Label>ID del Proyecto (Project ID)</Label>
+                <Input
+                  placeholder="Ej: quinta-la-juliana-prod"
+                  value={firebaseForm.projectId}
+                  onChange={(e) => setFirebaseForm((p) => ({ ...p, projectId: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <Label>Dominio de Autenticación (Auth Domain - opcional)</Label>
+                <Input
+                  placeholder="Ej: quinta-la-juliana-prod.firebaseapp.com"
+                  value={firebaseForm.authDomain}
+                  onChange={(e) => setFirebaseForm((p) => ({ ...p, authDomain: e.target.value }))}
+                />
+              </div>
+
+              <Button onClick={handleSaveFirebaseConfig} className="bg-stone-800 hover:bg-stone-900 text-white w-full">
+                <Save className="w-4 h-4 mr-2" /> Guardar Conexión Google Cloud
+              </Button>
             </div>
           </div>
         </TabsContent>

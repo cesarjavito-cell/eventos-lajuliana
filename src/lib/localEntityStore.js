@@ -1,4 +1,6 @@
 import { DEFAULT_SERVICES } from './seedServices';
+import { getFirebaseInstance } from './firebaseConfig';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 
 const DEFAULT_SETTINGS = [{
   id: 'set_1',
@@ -7,6 +9,22 @@ const DEFAULT_SETTINGS = [{
   quinta_name: 'Quinta La Juliana',
   quinta_phone: '',
 }];
+
+async function syncToFirestore(entityName, item, isDelete = false) {
+  try {
+    const { db } = getFirebaseInstance();
+    if (!db || !item || !item.id) return;
+    const colName = `${entityName.toLowerCase()}s`;
+    const docRef = doc(db, colName, String(item.id));
+    if (isDelete) {
+      await deleteDoc(docRef);
+    } else {
+      await setDoc(docRef, item, { merge: true });
+    }
+  } catch (e) {
+    console.warn('Firestore sync error:', e);
+  }
+}
 
 const DEFAULT_CABINS = [
   { id: 'cab_1', name: 'Cabaña 1 (Standard)', number: 1, capacity: 2, price_per_person: 15000, active: true },
@@ -143,6 +161,7 @@ export function createLocalEntityHandler(entityName, originalEntity) {
       };
       items.push(newEntity);
       saveLocalEntities(entityName, items);
+      syncToFirestore(entityName, newEntity);
       return newEntity;
     },
 
@@ -158,11 +177,13 @@ export function createLocalEntityHandler(entityName, originalEntity) {
       if (idx !== -1) {
         items[idx] = { ...items[idx], ...data, updated_at: new Date().toISOString() };
         saveLocalEntities(entityName, items);
+        syncToFirestore(entityName, items[idx]);
         return items[idx];
       }
       const newItem = { ...data, id, updated_at: new Date().toISOString() };
       items.push(newItem);
       saveLocalEntities(entityName, items);
+      syncToFirestore(entityName, newItem);
       return newItem;
     },
 
@@ -175,6 +196,7 @@ export function createLocalEntityHandler(entityName, originalEntity) {
       const items = getLocalEntities(entityName);
       const filtered = items.filter((i) => String(i.id) !== String(id));
       saveLocalEntities(entityName, filtered);
+      syncToFirestore(entityName, { id }, true);
       return { success: true };
     },
 
