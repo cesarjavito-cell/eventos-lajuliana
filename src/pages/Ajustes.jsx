@@ -1,165 +1,256 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useAuth } from '@/lib/AuthContext';
+import { Plus, Pencil, Trash2, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
-import { User, Trash2, Moon, Smartphone, Database, Download, Upload } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { useToast } from '@/components/ui/use-toast';
+import { MEASUREMENT_LABELS, CATEGORY_LABELS, formatCurrency } from '@/lib/pricing';
+import { ensureSeedServices } from '@/lib/seedServices';
+import ServiceFormDialog from '@/components/settings/ServiceFormDialog';
+import CabinFormDialog from '@/components/settings/CabinFormDialog';
+import UserManagement from '@/components/settings/UserManagement';
 
 export default function Ajustes() {
-  const { user, logout } = useAuth();
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [confirmText, setConfirmText] = useState('');
-  const [deleting, setDeleting] = useState(false);
+  const { toast } = useToast();
+  const [services, setServices] = useState([]);
+  const [cabins, setCabins] = useState([]);
+  const [settings, setSettings] = useState(null);
+  const [settingsForm, setSettingsForm] = useState({ next_year_inflation: 0, following_year_inflation: 0, quinta_name: '', quinta_phone: '' });
+  const [loading, setLoading] = useState(true);
+  const [savingSettings, setSavingSettings] = useState(false);
 
-  const handleDelete = async () => {
-    setDeleting(true);
+  const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
+  const [editingService, setEditingService] = useState(null);
+  const [cabinDialogOpen, setCabinDialogOpen] = useState(false);
+  const [editingCabin, setEditingCabin] = useState(null);
+
+  const loadData = useCallback(async () => {
     try {
-      await base44.functions.invoke('eliminarCuenta', {});
-      toast.success('Cuenta eliminada');
-      logout();
-    } catch (err) {
-      toast.error('Error al eliminar la cuenta');
-      setDeleting(false);
-      setDeleteOpen(false);
-      setConfirmText('');
+      await ensureSeedServices();
+      const [svcData, cabData, setData] = await Promise.all([
+        base44.entities.Service.list('display_order', 200),
+        base44.entities.Cabin.list('number', 20),
+        base44.entities.Setting.list(),
+      ]);
+      setServices(svcData || []);
+      setCabins(cabData || []);
+      const s = setData && setData.length > 0 ? setData[0] : null;
+      setSettings(s);
+      if (s) {
+        setSettingsForm({
+          next_year_inflation: s.next_year_inflation || 0,
+          following_year_inflation: s.following_year_inflation || 0,
+          quinta_name: s.quinta_name || 'Quinta La Juliana',
+          quinta_phone: s.quinta_phone || '',
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleDeleteService = async (id) => {
+    if (!confirm('¿Eliminar este servicio?')) return;
+    await base44.entities.Service.delete(id);
+    toast({ title: 'Servicio eliminado' });
+    loadData();
+  };
+
+  const handleDeleteCabin = async (id) => {
+    if (!confirm('¿Eliminar esta cabaña?')) return;
+    await base44.entities.Cabin.delete(id);
+    toast({ title: 'Cabaña eliminada' });
+    loadData();
+  };
+
+  const handleSaveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      const data = {
+        next_year_inflation: Number(settingsForm.next_year_inflation) || 0,
+        following_year_inflation: Number(settingsForm.following_year_inflation) || 0,
+        quinta_name: settingsForm.quinta_name,
+        quinta_phone: settingsForm.quinta_phone,
+      };
+      if (settings) {
+        await base44.entities.Setting.update(settings.id, data);
+      } else {
+        const created = await base44.entities.Setting.create(data);
+        setSettings(created);
+      }
+      toast({ title: 'Configuración guardada' });
+    } finally {
+      setSavingSettings(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-8 h-8 border-4 border-stone-200 border-t-stone-700 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-3xl font-heading font-semibold">Ajustes</h1>
-        <p className="text-muted-foreground mt-1">Configuración de la cuenta y la app</p>
-      </div>
+    <div className="max-w-5xl mx-auto">
+      <h1 className="font-display text-2xl font-semibold text-stone-800 mb-1">Ajustes</h1>
+      <p className="text-sm text-stone-500 mb-6">Gestión de servicios, cabañas e inflación</p>
 
-      <div className="rounded-xl border border-border bg-card p-5">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <User className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <p className="font-medium">{user?.full_name || 'Usuario'}</p>
-            <p className="text-sm text-muted-foreground">{user?.email}</p>
-          </div>
-        </div>
-      </div>
+      <Tabs defaultValue="services">
+        <TabsList className="mb-4">
+          <TabsTrigger value="services">Servicios</TabsTrigger>
+          <TabsTrigger value="inflation">Inflación</TabsTrigger>
+          <TabsTrigger value="cabins">Cabañas</TabsTrigger>
+          <TabsTrigger value="users">Usuarios</TabsTrigger>
+        </TabsList>
 
-      <div className="rounded-xl border border-border bg-card p-5 space-y-3">
-        <h2 className="font-heading font-semibold text-lg flex items-center gap-2">
-          <Moon className="w-5 h-5" /> Apariencia
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          El modo oscuro se activa automáticamente según la configuración de tu dispositivo. No necesitás activarlo manualmente.
-        </p>
-      </div>
-
-      <div className="rounded-xl border border-border bg-card p-5 space-y-3">
-        <h2 className="font-heading font-semibold text-lg flex items-center gap-2">
-          <Smartphone className="w-5 h-5" /> Dispositivo móvil
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Navegación inferior optimizada con áreas táctiles de 44px y soporte para safe-area en dispositivos con notch.
-        </p>
-      </div>
-
-      <div className="rounded-xl border border-border bg-card p-5 space-y-3">
-        <h2 className="font-heading font-semibold text-lg flex items-center gap-2">
-          <Database className="w-5 h-5" /> Copia de seguridad y datos
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Podés exportar una copia de seguridad con todos tus productos, menús y eventos o importar datos guardados en archivo JSON.
-        </p>
-        <div className="flex gap-3 flex-wrap pt-2">
-          <Button variant="outline" onClick={() => {
-            const data = base44.exportAllData();
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `catering_juliana_backup_${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-            toast.success('Copia de seguridad descargada');
-          }}>
-            <Download className="w-4 h-4 mr-2" /> Exportar Datos (.json)
-          </Button>
-          <label className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium border border-input rounded-md cursor-pointer bg-background hover:bg-accent hover:text-accent-foreground shadow-sm">
-            <Upload className="w-4 h-4 mr-2" /> Importar Datos
-            <input
-              type="file"
-              accept="*/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                  try {
-                    const data = JSON.parse(event.target.result);
-                    base44.importAllData(data);
-                    toast.success('Datos importados correctamente');
-                    setTimeout(() => window.location.reload(), 1000);
-                  } catch (err) {
-                    toast.error('El archivo JSON no es válido');
-                  }
-                };
-                reader.readAsText(file);
+        <TabsContent value="services">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="font-semibold text-stone-700">Lista de servicios</h2>
+            <Button
+              onClick={() => {
+                setEditingService(null);
+                setServiceDialogOpen(true);
               }}
-            />
-          </label>
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (window.confirm('¿Querés borrar todos los datos para crear tus productos y menús desde cero?')) {
-                base44.clearAllData();
-                toast.success('Se vació la lista. Podés crear tus productos desde cero.');
-                setTimeout(() => window.location.reload(), 500);
-              }
-            }}
-          >
-            Vaciar todo para empezar de cero
-          </Button>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-destructive/30 bg-card p-5 space-y-3">
-        <h2 className="font-heading font-semibold text-lg flex items-center gap-2 text-destructive">
-          <Trash2 className="w-5 h-5" /> Eliminar cuenta
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Al eliminar tu cuenta se borrarán permanentemente todos tus datos: productos, menús, eventos y categorías. Esta acción no se puede deshacer.
-        </p>
-        <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
-          <Trash2 className="w-4 h-4 mr-1" /> Eliminar cuenta
-        </Button>
-      </div>
-
-      <AlertDialog open={deleteOpen} onOpenChange={(open) => { setDeleteOpen(open); if (!open) setConfirmText(''); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar cuenta permanentemente?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Se borrarán todos tus productos, menús, eventos y categorías. Para confirmar, escribí "ELIMINAR" abajo.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <Input
-            placeholder="Escribí ELIMINAR"
-            value={confirmText}
-            onChange={(e) => setConfirmText(e.target.value)}
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={confirmText !== 'ELIMINAR' || deleting}
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleting ? 'Eliminando...' : 'Eliminar cuenta'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              <Plus className="w-4 h-4 mr-1" /> Nuevo servicio
+            </Button>
+          </div>
+          <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+            {services.length === 0 ? (
+              <p className="p-8 text-center text-stone-400 text-sm">No hay servicios cargados todavía.</p>
+            ) : (
+              <div className="divide-y divide-stone-100">
+                {services.map((svc) => (
+                  <div key={svc.id} className="flex items-center justify-between p-4 hover:bg-stone-50">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm text-stone-800">{svc.name}</span>
+                        {!svc.active && <Badge variant="secondary">Inactivo</Badge>}
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-1 text-xs text-stone-500">
+                        <Badge variant="outline">{CATEGORY_LABELS[svc.category] || svc.category}</Badge>
+                        <Badge variant="outline">{MEASUREMENT_LABELS[svc.measurement_type]}</Badge>
+                        <span className="text-stone-600">{formatCurrency(svc.base_price)}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <Button variant="ghost" size="icon" onClick={() => { setEditingService(svc); setServiceDialogOpen(true); }}>
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteService(svc.id)}>
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="inflation">
+          <div className="bg-white rounded-xl border border-stone-200 p-6 max-w-xl">
+            <h2 className="font-semibold text-stone-700 mb-1">Índice de inflación</h2>
+            <p className="text-sm text-stone-500 mb-6">
+              Estos porcentajes se aplican automáticamente a los presupuestos cuando la fecha del evento es en un año futuro.
+            </p>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Inflación próximo año (%)</Label>
+                <Input
+                  type="number"
+                  value={settingsForm.next_year_inflation}
+                  onChange={(e) => setSettingsForm((p) => ({ ...p, next_year_inflation: e.target.value }))}
+                />
+                <p className="text-xs text-stone-400">Se aplica cuando el evento es el año que viene.</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Inflación año siguiente (%)</Label>
+                <Input
+                  type="number"
+                  value={settingsForm.following_year_inflation}
+                  onChange={(e) => setSettingsForm((p) => ({ ...p, following_year_inflation: e.target.value }))}
+                />
+                <p className="text-xs text-stone-400">Se aplica (compuesta) para eventos a 2+ años.</p>
+              </div>
+              <div className="border-t border-stone-100 pt-4 space-y-4">
+                <div className="space-y-1.5">
+                  <Label>Nombre de la quinta</Label>
+                  <Input value={settingsForm.quinta_name} onChange={(e) => setSettingsForm((p) => ({ ...p, quinta_name: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Teléfono de contacto</Label>
+                  <Input value={settingsForm.quinta_phone} onChange={(e) => setSettingsForm((p) => ({ ...p, quinta_phone: e.target.value }))} />
+                </div>
+              </div>
+              <Button onClick={handleSaveSettings} disabled={savingSettings}>
+                <Save className="w-4 h-4 mr-1" />
+                {savingSettings ? 'Guardando...' : 'Guardar configuración'}
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="cabins">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="font-semibold text-stone-700">Cabañas ({cabins.length})</h2>
+            <Button onClick={() => { setEditingCabin(null); setCabinDialogOpen(true); }}>
+              <Plus className="w-4 h-4 mr-1" /> Nueva cabaña
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {cabins.map((cab) => (
+              <div key={cab.id} className="bg-white rounded-xl border border-stone-200 p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-semibold text-sm text-stone-800">{cab.name}</h3>
+                    <p className="text-xs text-stone-500">Cabaña N° {cab.number}</p>
+                  </div>
+                  {cab.active ? <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Disponible</Badge> : <Badge variant="secondary">No disponible</Badge>}
+                </div>
+                {cab.description && <p className="text-xs text-stone-500 mt-2">{cab.description}</p>}
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-stone-100">
+                  <span className="text-sm font-medium text-stone-700">{formatCurrency(cab.base_price_per_night)}<span className="text-xs text-stone-400"> /noche</span></span>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => { setEditingCabin(cab); setCabinDialogOpen(true); }}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDeleteCabin(cab.id)}>
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="users">
+          <UserManagement />
+        </TabsContent>
+      </Tabs>
+
+      <ServiceFormDialog
+        service={editingService}
+        open={serviceDialogOpen}
+        onOpenChange={setServiceDialogOpen}
+        onSaved={loadData}
+      />
+      <CabinFormDialog
+        cabin={editingCabin}
+        open={cabinDialogOpen}
+        onOpenChange={setCabinDialogOpen}
+        onSaved={loadData}
+      />
     </div>
   );
 }

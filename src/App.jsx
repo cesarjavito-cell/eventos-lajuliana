@@ -1,79 +1,74 @@
-import React from 'react';
 import { Toaster } from "@/components/ui/toaster"
+import { ThemeProvider } from 'next-themes'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
-import { AuthProvider } from '@/lib/AuthContext';
+import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import Layout from '@/components/Layout';
-import Dashboard from '@/pages/Dashboard';
-import Productos from '@/pages/Productos';
-import Menus from '@/pages/Menus';
-import Eventos from '@/pages/Eventos';
-import CalculoCompra from '@/pages/CalculoCompra';
+import RoleGuard from '@/components/RoleGuard';
+import Home from '@/pages/Home';
+import Presupuestos from '@/pages/Presupuestos';
 import Ajustes from '@/pages/Ajustes';
-import { Toaster as HotToaster } from 'react-hot-toast';
-
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error("ErrorBoundary caught error:", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
-          <div className="max-w-md space-y-4">
-            <h2 className="text-2xl font-bold font-heading text-foreground">La Juliana Catering</h2>
-            <p className="text-muted-foreground text-sm">
-              La aplicación se ha actualizado. Presioná el botón para recargar el contenido.
-            </p>
-            <button
-              onClick={() => {
-                localStorage.clear();
-                window.location.reload();
-              }}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium text-sm shadow-sm"
-            >
-              Recargar Aplicación
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+import Eventos from '@/pages/Eventos';
+import Cabanas from '@/pages/Cabanas';
+import Login from '@/pages/Login';
+import Register from '@/pages/Register';
+import ForgotPassword from '@/pages/ForgotPassword';
+import ResetPassword from '@/pages/ResetPassword';
+import OAuthConsent from '@/pages/OAuthConsent';
 
 const AuthenticatedApp = () => {
+  const { isLoadingAuth, isLoadingPublicSettings, authError } = useAuth();
+
+  // Show loading spinner while checking app public settings or auth
+  if (isLoadingPublicSettings || isLoadingAuth) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-amber-200 border-t-amber-800 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  // Handle specific user not registered error
+  if (authError?.type === 'user_not_registered') {
+    return <UserNotRegisteredError />;
+  }
+
+  // Render the main app routes
   return (
     <Routes>
-      <Route element={<Layout />}>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/productos" element={<Productos />} />
-        <Route path="/menus" element={<Menus />} />
-        <Route path="/eventos" element={<Eventos />} />
-        <Route path="/calculo" element={<CalculoCompra />} />
-        <Route path="/ajustes" element={<Ajustes />} />
+      {/* Public Auth Routes */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/oauth-consent" element={<OAuthConsent />} />
+
+      {/* Protected App Routes */}
+      <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
+        <Route element={<Layout />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/presupuestos" element={<RoleGuard page="presupuestos"><Presupuestos /></RoleGuard>} />
+          <Route path="/ajustes" element={<RoleGuard page="ajustes"><Ajustes /></RoleGuard>} />
+          <Route path="/eventos" element={<RoleGuard page="eventos"><Eventos /></RoleGuard>} />
+          <Route path="/cabanas" element={<RoleGuard page="cabanas"><Cabanas /></RoleGuard>} />
+        </Route>
       </Route>
+
+      {/* 404 Fallback */}
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
 };
 
+
 function App() {
   return (
-    <ErrorBoundary>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
       <AuthProvider>
         <QueryClientProvider client={queryClientInstance}>
           <Router>
@@ -81,11 +76,10 @@ function App() {
             <AuthenticatedApp />
           </Router>
           <Toaster />
-          <HotToaster position="top-right" toastOptions={{ duration: 3000, style: { borderRadius: '10px', background: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' } }} />
         </QueryClientProvider>
       </AuthProvider>
-    </ErrorBoundary>
-  );
+    </ThemeProvider>
+  )
 }
 
-export default App;
+export default App

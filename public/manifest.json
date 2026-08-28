@@ -1,16 +1,17 @@
 {
-  "name": "La Juliana - Gestión de Catering",
+  "name": "Quinta La Juliana - Catering & Eventos",
   "short_name": "La Juliana",
-  "description": "Aplicación de Gestión de Catering y Eventos para La Juliana",
+  "description": "Sistema oficial de gestión de catering, presupuestos, egresados y hospedaje de Quinta La Juliana.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#263824",
-  "theme_color": "#263824",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#6d28d9",
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "/signature.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]
