@@ -20,7 +20,7 @@ export default function Ajustes() {
   const [services, setServices] = useState([]);
   const [cabins, setCabins] = useState([]);
   const [settings, setSettings] = useState(null);
-  const [settingsForm, setSettingsForm] = useState({ next_year_inflation: 0, following_year_inflation: 0, quinta_name: '', quinta_phone: '' });
+  const [settingsForm, setSettingsForm] = useState({ next_year_inflation: 0, following_year_inflation: 0, quinta_name: 'Quinta La Juliana', quinta_phone: '' });
   const [loading, setLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
 
@@ -28,6 +28,8 @@ export default function Ajustes() {
   const [editingService, setEditingService] = useState(null);
   const [cabinDialogOpen, setCabinDialogOpen] = useState(false);
   const [editingCabin, setEditingCabin] = useState(null);
+
+  const fileInputRef = useRef(null);
 
   const [firebaseForm, setFirebaseForm] = useState({
     apiKey: '',
@@ -39,9 +41,13 @@ export default function Ajustes() {
   });
 
   useEffect(() => {
-    const cfg = getStoredFirebaseConfig();
-    if (cfg) {
-      setFirebaseForm(cfg);
+    try {
+      const cfg = getStoredFirebaseConfig();
+      if (cfg) {
+        setFirebaseForm(cfg);
+      }
+    } catch (e) {
+      console.warn('Firebase config read error:', e);
     }
   }, []);
 
@@ -64,8 +70,8 @@ export default function Ajustes() {
         base44.entities.Cabin.list('number', 20),
         base44.entities.Setting.list(),
       ]);
-      setServices(svcData || []);
-      setCabins(cabData || []);
+      setServices(Array.isArray(svcData) ? svcData : []);
+      setCabins(Array.isArray(cabData) ? cabData : []);
       const s = setData && setData.length > 0 ? setData[0] : null;
       setSettings(s);
       if (s) {
@@ -76,6 +82,8 @@ export default function Ajustes() {
           quinta_phone: s.quinta_phone || '',
         });
       }
+    } catch (e) {
+      console.error('Error loading ajustes data:', e);
     } finally {
       setLoading(false);
     }
@@ -87,16 +95,24 @@ export default function Ajustes() {
 
   const handleDeleteService = async (id) => {
     if (!confirm('¿Eliminar este servicio?')) return;
-    await base44.entities.Service.delete(id);
-    toast({ title: 'Servicio eliminado' });
-    loadData();
+    try {
+      await base44.entities.Service.delete(id);
+      toast({ title: 'Servicio eliminado' });
+      loadData();
+    } catch (e) {
+      toast({ title: 'Error al eliminar', variant: 'destructive' });
+    }
   };
 
   const handleDeleteCabin = async (id) => {
     if (!confirm('¿Eliminar esta cabaña?')) return;
-    await base44.entities.Cabin.delete(id);
-    toast({ title: 'Cabaña eliminada' });
-    loadData();
+    try {
+      await base44.entities.Cabin.delete(id);
+      toast({ title: 'Cabaña eliminada' });
+      loadData();
+    } catch (e) {
+      toast({ title: 'Error al eliminar', variant: 'destructive' });
+    }
   };
 
   const handleSaveSettings = async () => {
@@ -105,16 +121,18 @@ export default function Ajustes() {
       const data = {
         next_year_inflation: Number(settingsForm.next_year_inflation) || 0,
         following_year_inflation: Number(settingsForm.following_year_inflation) || 0,
-        quinta_name: settingsForm.quinta_name,
-        quinta_phone: settingsForm.quinta_phone,
+        quinta_name: settingsForm.quinta_name || 'Quinta La Juliana',
+        quinta_phone: settingsForm.quinta_phone || '',
       };
-      if (settings) {
+      if (settings?.id) {
         await base44.entities.Setting.update(settings.id, data);
       } else {
         const created = await base44.entities.Setting.create(data);
         setSettings(created);
       }
       toast({ title: 'Configuración guardada' });
+    } catch (e) {
+      toast({ title: 'Error al guardar', variant: 'destructive' });
     } finally {
       setSavingSettings(false);
     }
@@ -141,13 +159,17 @@ export default function Ajustes() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async (evt) => {
-      const content = evt.target.result;
-      const success = importBackupJSON(content);
-      if (success) {
-        toast({ title: '¡Datos cargados con éxito!', description: 'Tus servicios y eventos se han restaurado correctamente.' });
-        await loadData();
-      } else {
-        toast({ title: 'Error', description: 'El archivo de backup no tiene un formato válido', variant: 'destructive' });
+      try {
+        const content = evt.target.result;
+        const success = importBackupJSON(content);
+        if (success) {
+          toast({ title: '¡Datos cargados con éxito!', description: 'Tus servicios y eventos se han restaurado correctamente.' });
+          await loadData();
+        } else {
+          toast({ title: 'Error', description: 'El archivo de backup no tiene un formato válido', variant: 'destructive' });
+        }
+      } catch (err) {
+        toast({ title: 'Error', description: 'Error leyendo archivo', variant: 'destructive' });
       }
     };
     reader.readAsText(file);
@@ -161,13 +183,16 @@ export default function Ajustes() {
     );
   }
 
+  const safeServices = (services || []).filter(Boolean);
+  const safeCabins = (cabins || []).filter(Boolean);
+
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="max-w-5xl mx-auto pb-10">
       <h1 className="font-display text-2xl font-semibold text-stone-800 mb-1">Ajustes</h1>
       <p className="text-sm text-stone-500 mb-6">Gestión de servicios, cabañas, inflación y copias de datos</p>
 
       <Tabs defaultValue="services">
-        <TabsList className="mb-4">
+        <TabsList className="mb-4 flex flex-wrap gap-1">
           <TabsTrigger value="services">Servicios</TabsTrigger>
           <TabsTrigger value="inflation">Inflación</TabsTrigger>
           <TabsTrigger value="cabins">Cabañas</TabsTrigger>
@@ -178,7 +203,7 @@ export default function Ajustes() {
 
         <TabsContent value="services">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="font-semibold text-stone-700">Lista de servicios</h2>
+            <h2 className="font-semibold text-stone-700">Lista de servicios ({safeServices.length})</h2>
             <Button
               onClick={() => {
                 setEditingService(null);
@@ -189,22 +214,22 @@ export default function Ajustes() {
             </Button>
           </div>
           <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
-            {services.length === 0 ? (
+            {safeServices.length === 0 ? (
               <p className="p-8 text-center text-stone-400 text-sm">No hay servicios cargados todavía.</p>
             ) : (
               <div className="divide-y divide-stone-100">
-                {services.map((svc) => (
-                  <div key={svc.id} className="p-4 flex items-center justify-between hover:bg-stone-50">
+                {safeServices.map((svc) => (
+                  <div key={svc.id || Math.random()} className="p-4 flex items-center justify-between hover:bg-stone-50">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-stone-800">{svc.name}</span>
+                        <span className="font-medium text-stone-800">{svc.name || 'Servicio sin nombre'}</span>
                         <Badge variant="outline" className="text-xs text-stone-500">
-                          {CATEGORY_LABELS[svc.category] || svc.category}
+                          {CATEGORY_LABELS[svc.category] || svc.category || 'General'}
                         </Badge>
                         {!svc.active && <Badge variant="secondary">Inactivo</Badge>}
                       </div>
                       <p className="text-xs text-stone-400 mt-1">
-                        Tipo: {MEASUREMENT_LABELS[svc.measurement_type]} · Precio base: {formatCurrency(svc.base_price)}
+                        Tipo: {MEASUREMENT_LABELS[svc.measurement_type] || svc.measurement_type || 'Estándar'} · Precio base: {formatCurrency(svc.base_price)}
                         {svc.hours_included > 0 && ` (${svc.hours_included} hs inc.)`}
                       </p>
                     </div>
@@ -238,7 +263,7 @@ export default function Ajustes() {
                 <Label>Inflación proyectada año que viene (%)</Label>
                 <Input
                   type="number"
-                  value={settingsForm.next_year_inflation}
+                  value={settingsForm.next_year_inflation || 0}
                   onChange={(e) => setSettingsForm((p) => ({ ...p, next_year_inflation: parseFloat(e.target.value) || 0 }))}
                 />
               </div>
@@ -246,7 +271,7 @@ export default function Ajustes() {
                 <Label>Inflación proyectada año subsiguiente (%)</Label>
                 <Input
                   type="number"
-                  value={settingsForm.following_year_inflation}
+                  value={settingsForm.following_year_inflation || 0}
                   onChange={(e) => setSettingsForm((p) => ({ ...p, following_year_inflation: parseFloat(e.target.value) || 0 }))}
                 />
               </div>
@@ -259,24 +284,24 @@ export default function Ajustes() {
 
         <TabsContent value="cabins">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="font-semibold text-stone-700">Cabañas ({cabins.length})</h2>
+            <h2 className="font-semibold text-stone-700">Cabañas ({safeCabins.length})</h2>
             <Button onClick={() => { setEditingCabin(null); setCabinDialogOpen(true); }}>
               <Plus className="w-4 h-4 mr-1" /> Nueva cabaña
             </Button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {cabins.map((cab) => (
-              <div key={cab.id} className="bg-white rounded-xl border border-stone-200 p-4">
+            {safeCabins.map((cab) => (
+              <div key={cab.id || Math.random()} className="bg-white rounded-xl border border-stone-200 p-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="font-semibold text-sm text-stone-800">{cab.name}</h3>
-                    <p className="text-xs text-stone-500">Cabaña N° {cab.number}</p>
+                    <h3 className="font-semibold text-sm text-stone-800">{cab.name || 'Cabaña'}</h3>
+                    <p className="text-xs text-stone-500">Cabaña N° {cab.number || 1}</p>
                   </div>
                   {cab.active ? <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Disponible</Badge> : <Badge variant="secondary">No disponible</Badge>}
                 </div>
                 {cab.description && <p className="text-xs text-stone-500 mt-2">{cab.description}</p>}
                 <div className="flex items-center justify-between mt-3 pt-3 border-t border-stone-100">
-                  <span className="text-sm font-medium text-stone-700">{formatCurrency(cab.base_price_per_night)}<span className="text-xs text-stone-400"> /noche</span></span>
+                  <span className="text-sm font-medium text-stone-700">{formatCurrency(cab.base_price_per_night || cab.price_per_person)}<span className="text-xs text-stone-400"> /noche</span></span>
                   <div className="flex gap-1">
                     <Button variant="ghost" size="icon" onClick={() => { setEditingCabin(cab); setCabinDialogOpen(true); }}>
                       <Pencil className="w-4 h-4" />
@@ -358,8 +383,8 @@ export default function Ajustes() {
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-800">
                 💡 <strong>¿Cómo obtener tu clave gratuita de Google Firebase?</strong><br />
                 1. Entra a <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer" className="underline font-semibold">console.firebase.google.com</a>.<br />
-                2. Crea un proyecto gratuito llamado <strong>Quinta La Juliana</strong>.<br />
-                3. Agrega una Web App, copia las claves de configuración y pégalas a continuación.
+                2. Abre tu proyecto <strong>Eventos La Juliana</strong>.<br />
+                3. En Configuración del SDK haz clic en <strong>Config</strong>, copia las claves y pégalas a continuación.
               </div>
             )}
 
@@ -368,7 +393,7 @@ export default function Ajustes() {
                 <Label>API Key de Google Firebase</Label>
                 <Input
                   placeholder="Ej: AIzaSyD..."
-                  value={firebaseForm.apiKey}
+                  value={firebaseForm.apiKey || ''}
                   onChange={(e) => setFirebaseForm((p) => ({ ...p, apiKey: e.target.value }))}
                 />
               </div>
@@ -376,8 +401,8 @@ export default function Ajustes() {
               <div>
                 <Label>ID del Proyecto (Project ID)</Label>
                 <Input
-                  placeholder="Ej: quinta-la-juliana-prod"
-                  value={firebaseForm.projectId}
+                  placeholder="Ej: eventos-la-juliana"
+                  value={firebaseForm.projectId || ''}
                   onChange={(e) => setFirebaseForm((p) => ({ ...p, projectId: e.target.value }))}
                 />
               </div>
@@ -385,8 +410,8 @@ export default function Ajustes() {
               <div>
                 <Label>Dominio de Autenticación (Auth Domain - opcional)</Label>
                 <Input
-                  placeholder="Ej: quinta-la-juliana-prod.firebaseapp.com"
-                  value={firebaseForm.authDomain}
+                  placeholder="Ej: eventos-la-juliana.firebaseapp.com"
+                  value={firebaseForm.authDomain || ''}
                   onChange={(e) => setFirebaseForm((p) => ({ ...p, authDomain: e.target.value }))}
                 />
               </div>
