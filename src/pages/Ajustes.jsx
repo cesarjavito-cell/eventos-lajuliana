@@ -17,6 +17,18 @@ import UserManagement from '@/components/settings/UserManagement';
 
 export default function Ajustes() {
   const { toast } = useToast();
+  const [services, setServices] = useState([]);
+  const [cabins, setCabins] = useState([]);
+  const [settings, setSettings] = useState(null);
+  const [settingsForm, setSettingsForm] = useState({ next_year_inflation: 0, following_year_inflation: 0, quinta_name: '', quinta_phone: '' });
+  const [loading, setLoading] = useState(true);
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
+  const [editingService, setEditingService] = useState(null);
+  const [cabinDialogOpen, setCabinDialogOpen] = useState(false);
+  const [editingCabin, setEditingCabin] = useState(null);
+
   const [firebaseForm, setFirebaseForm] = useState({
     apiKey: '',
     authDomain: '',
