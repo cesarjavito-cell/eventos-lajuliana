@@ -185,11 +185,35 @@ export function createLocalEntityHandler(entityName, originalEntity) {
         }
       } catch (e) {}
       const items = getLocalEntities(entityName);
-      const filtered = items.filter((item) => {
-        return !Object.entries(query).every(([k, v]) => item[k] === v);
-      });
       saveLocalEntities(entityName, filtered);
       return { success: true };
     },
   };
 }
+
+export function exportBackupJSON() {
+  const entities = ['Service', 'Budget', 'Event', 'Cabin', 'Payment', 'Graduate', 'Setting'];
+  const backup = {};
+  entities.forEach((ent) => {
+    backup[ent] = getLocalEntities(ent);
+  });
+  return JSON.stringify(backup, null, 2);
+}
+
+export function importBackupJSON(jsonString) {
+  try {
+    const data = JSON.parse(jsonString);
+    if (data && typeof data === 'object') {
+      Object.entries(data).forEach(([entityName, items]) => {
+        if (Array.isArray(items)) {
+          saveLocalEntities(entityName, items);
+        }
+      });
+      return true;
+    }
+  } catch (e) {
+    console.error('Import error:', e);
+  }
+  return false;
+}
+

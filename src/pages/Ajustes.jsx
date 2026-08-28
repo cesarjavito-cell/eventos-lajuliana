@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Plus, Pencil, Trash2, Save } from 'lucide-react';
+import { Plus, Pencil, Trash2, Save, Download, Upload, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
 import { MEASUREMENT_LABELS, CATEGORY_LABELS, formatCurrency } from '@/lib/pricing';
 import { ensureSeedServices } from '@/lib/seedServices';
+import { exportBackupJSON, importBackupJSON } from '@/lib/localEntityStore';
 import ServiceFormDialog from '@/components/settings/ServiceFormDialog';
 import CabinFormDialog from '@/components/settings/CabinFormDialog';
 import UserManagement from '@/components/settings/UserManagement';
@@ -91,6 +92,39 @@ export default function Ajustes() {
     }
   };
 
+  const handleExportBackup = () => {
+    try {
+      const jsonStr = exportBackupJSON();
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `quinta_la_juliana_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: 'Copia descargada', description: 'Se guardaron todos tus servicios, presupuestos y datos.' });
+    } catch (e) {
+      toast({ title: 'Error', description: 'No se pudo exportar el backup', variant: 'destructive' });
+    }
+  };
+
+  const handleImportFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const content = evt.target.result;
+      const success = importBackupJSON(content);
+      if (success) {
+        toast({ title: '¡Datos cargados con éxito!', description: 'Tus servicios y eventos se han restaurado correctamente.' });
+        await loadData();
+      } else {
+        toast({ title: 'Error', description: 'El archivo de backup no tiene un formato válido', variant: 'destructive' });
+      }
+    };
+    reader.readAsText(file);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -102,7 +136,7 @@ export default function Ajustes() {
   return (
     <div className="max-w-5xl mx-auto">
       <h1 className="font-display text-2xl font-semibold text-stone-800 mb-1">Ajustes</h1>
-      <p className="text-sm text-stone-500 mb-6">Gestión de servicios, cabañas e inflación</p>
+      <p className="text-sm text-stone-500 mb-6">Gestión de servicios, cabañas, inflación y copias de datos</p>
 
       <Tabs defaultValue="services">
         <TabsList className="mb-4">
@@ -110,6 +144,7 @@ export default function Ajustes() {
           <TabsTrigger value="inflation">Inflación</TabsTrigger>
           <TabsTrigger value="cabins">Cabañas</TabsTrigger>
           <TabsTrigger value="users">Usuarios</TabsTrigger>
+          <TabsTrigger value="backup">💾 Copia de Seguridad</TabsTrigger>
         </TabsList>
 
         <TabsContent value="services">
@@ -130,20 +165,29 @@ export default function Ajustes() {
             ) : (
               <div className="divide-y divide-stone-100">
                 {services.map((svc) => (
-                  <div key={svc.id} className="flex items-center justify-between p-4 hover:bg-stone-50">
-                    <div className="min-w-0 flex-1">
+                  <div key={svc.id} className="p-4 flex items-center justify-between hover:bg-stone-50">
+                    <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm text-stone-800">{svc.name}</span>
+                        <span className="font-medium text-stone-800">{svc.name}</span>
+                        <Badge variant="outline" className="text-xs text-stone-500">
+                          {CATEGORY_LABELS[svc.category] || svc.category}
+                        </Badge>
                         {!svc.active && <Badge variant="secondary">Inactivo</Badge>}
                       </div>
-                      <div className="flex flex-wrap gap-2 mt-1 text-xs text-stone-500">
-                        <Badge variant="outline">{CATEGORY_LABELS[svc.category] || svc.category}</Badge>
-                        <Badge variant="outline">{MEASUREMENT_LABELS[svc.measurement_type]}</Badge>
-                        <span className="text-stone-600">{formatCurrency(svc.base_price)}</span>
-                      </div>
+                      <p className="text-xs text-stone-400 mt-1">
+                        Tipo: {MEASUREMENT_LABELS[svc.measurement_type]} · Precio base: {formatCurrency(svc.base_price)}
+                        {svc.hours_included > 0 && ` (${svc.hours_included} hs inc.)`}
+                      </p>
                     </div>
-                    <div className="flex gap-1 shrink-0">
-                      <Button variant="ghost" size="icon" onClick={() => { setEditingService(svc); setServiceDialogOpen(true); }}>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setEditingService(svc);
+                          setServiceDialogOpen(true);
+                        }}
+                      >
                         <Pencil className="w-4 h-4" />
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDeleteService(svc.id)}>
@@ -158,43 +202,27 @@ export default function Ajustes() {
         </TabsContent>
 
         <TabsContent value="inflation">
-          <div className="bg-white rounded-xl border border-stone-200 p-6 max-w-xl">
-            <h2 className="font-semibold text-stone-700 mb-1">Índice de inflación</h2>
-            <p className="text-sm text-stone-500 mb-6">
-              Estos porcentajes se aplican automáticamente a los presupuestos cuando la fecha del evento es en un año futuro.
-            </p>
+          <div className="bg-white rounded-xl border border-stone-200 p-6 max-w-xl space-y-4">
+            <h2 className="font-semibold text-stone-800 mb-2">Porcentajes de inflación proyectada</h2>
             <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label>Inflación próximo año (%)</Label>
+              <div>
+                <Label>Inflación proyectada año que viene (%)</Label>
                 <Input
                   type="number"
                   value={settingsForm.next_year_inflation}
-                  onChange={(e) => setSettingsForm((p) => ({ ...p, next_year_inflation: e.target.value }))}
+                  onChange={(e) => setSettingsForm((p) => ({ ...p, next_year_inflation: parseFloat(e.target.value) || 0 }))}
                 />
-                <p className="text-xs text-stone-400">Se aplica cuando el evento es el año que viene.</p>
               </div>
-              <div className="space-y-1.5">
-                <Label>Inflación año siguiente (%)</Label>
+              <div>
+                <Label>Inflación proyectada año subsiguiente (%)</Label>
                 <Input
                   type="number"
                   value={settingsForm.following_year_inflation}
-                  onChange={(e) => setSettingsForm((p) => ({ ...p, following_year_inflation: e.target.value }))}
+                  onChange={(e) => setSettingsForm((p) => ({ ...p, following_year_inflation: parseFloat(e.target.value) || 0 }))}
                 />
-                <p className="text-xs text-stone-400">Se aplica (compuesta) para eventos a 2+ años.</p>
-              </div>
-              <div className="border-t border-stone-100 pt-4 space-y-4">
-                <div className="space-y-1.5">
-                  <Label>Nombre de la quinta</Label>
-                  <Input value={settingsForm.quinta_name} onChange={(e) => setSettingsForm((p) => ({ ...p, quinta_name: e.target.value }))} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Teléfono de contacto</Label>
-                  <Input value={settingsForm.quinta_phone} onChange={(e) => setSettingsForm((p) => ({ ...p, quinta_phone: e.target.value }))} />
-                </div>
               </div>
               <Button onClick={handleSaveSettings} disabled={savingSettings}>
-                <Save className="w-4 h-4 mr-1" />
-                {savingSettings ? 'Guardando...' : 'Guardar configuración'}
+                <Save className="w-4 h-4 mr-1" /> {savingSettings ? 'Guardando...' : 'Guardar inflación'}
               </Button>
             </div>
           </div>
@@ -236,6 +264,46 @@ export default function Ajustes() {
 
         <TabsContent value="users">
           <UserManagement />
+        </TabsContent>
+
+        <TabsContent value="backup">
+          <div className="bg-white rounded-xl border border-stone-200 p-6 space-y-6">
+            <div>
+              <h2 className="font-semibold text-lg text-stone-800 flex items-center gap-2">
+                <Database className="w-5 h-5 text-emerald-600" /> Copia de Seguridad y Migración de Datos
+              </h2>
+              <p className="text-sm text-stone-500 mt-1">
+                Transfiere tus datos cargados en <code>localhost</code> directamente a tu nueva versión web publicada en Vercel en 2 clics.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div className="bg-stone-50 border border-stone-200 rounded-xl p-5 flex flex-col justify-between space-y-4">
+                <div>
+                  <h3 className="font-semibold text-stone-800 text-sm">1. Exportar Datos Guardados</h3>
+                  <p className="text-xs text-stone-500 mt-1">
+                    Descarga un archivo con todos los servicios, precios, presupuestos, egresados y cabañas cargados.
+                  </p>
+                </div>
+                <Button onClick={handleExportBackup} className="bg-emerald-600 hover:bg-emerald-700 text-white w-full">
+                  <Download className="w-4 h-4 mr-2" /> Descargar Copia de Datos (.json)
+                </Button>
+              </div>
+
+              <div className="bg-stone-50 border border-stone-200 rounded-xl p-5 flex flex-col justify-between space-y-4">
+                <div>
+                  <h3 className="font-semibold text-stone-800 text-sm">2. Restaurar o Cargar en la Web</h3>
+                  <p className="text-xs text-stone-500 mt-1">
+                    Selecciona el archivo descargado para restaurar instantáneamente todos tus datos en la aplicación web.
+                  </p>
+                </div>
+                <input type="file" accept=".json" ref={fileInputRef} onChange={handleImportFile} className="hidden" />
+                <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 w-full">
+                  <Upload className="w-4 h-4 mr-2" /> Cargar / Restaurar Archivo (.json)
+                </Button>
+              </div>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 
