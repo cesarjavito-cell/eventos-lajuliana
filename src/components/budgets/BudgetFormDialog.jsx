@@ -27,7 +27,7 @@ import {
   CATEGORY_LABELS,
   EVENT_TYPE_LABELS,
 } from '@/lib/pricing';
-import { drawServiceIcon } from '@/lib/pdfServiceIcons';
+import { drawServiceIcon } from '@/lib/PdfServiceIcons';
 import { useAuth } from '@/lib/AuthContext';
 
 const HEADER_IMAGE_URL = 'https://media.base44.com/images/public/6a70f20332bd3ec0ab545f1c/c60663606_WhatsAppImage2026-08-04at104612.jpg';
