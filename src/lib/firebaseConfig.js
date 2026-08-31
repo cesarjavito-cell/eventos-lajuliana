@@ -1,7 +1,16 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore';
 
 const STORAGE_KEY = 'antigravity_quinta_firebase_config';
+
+export const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAJO58beB_dKVUfjH7HkphJHgWRAe6tLI",
+  authDomain: "eventos-la-juliana.firebaseapp.com",
+  projectId: "eventos-la-juliana",
+  storageBucket: "eventos-la-juliana.appspot.com",
+  messagingSenderId: "671375425287",
+  appId: "1:671375425287:web:17e251483a41a8e60ccfa2"
+};
 
 export function getStoredFirebaseConfig() {
   try {
@@ -25,7 +34,8 @@ export function getStoredFirebaseConfig() {
     };
   }
 
-  return null;
+  // Default to Javier Almada's official Quinta La Juliana Google Cloud Project
+  return DEFAULT_FIREBASE_CONFIG;
 }
 
 export function saveFirebaseConfig(configObj) {

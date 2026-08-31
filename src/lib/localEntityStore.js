@@ -1,6 +1,7 @@
 import { DEFAULT_SERVICES } from './seedServices';
 import { getFirebaseInstance } from './firebaseConfig';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, collection, onSnapshot } from 'firebase/firestore';
+import { queryClientInstance } from './query-client';
 
 const DEFAULT_SETTINGS = [{
   id: 'set_1',
@@ -9,6 +10,45 @@ const DEFAULT_SETTINGS = [{
   quinta_name: 'Quinta La Juliana',
   quinta_phone: '',
 }];
+
+const activeFirestoreListeners = {};
+
+export function initFirestoreRealtimeSync() {
+  const { db } = getFirebaseInstance();
+  if (!db) return;
+
+  const entities = ['Service', 'Budget', 'Event', 'Cabin', 'CabinReservation', 'Payment', 'Graduate', 'Setting'];
+  entities.forEach((entityName) => {
+    const colName = `${entityName.toLowerCase()}s`;
+    if (activeFirestoreListeners[colName]) return;
+
+    try {
+      const colRef = collection(db, colName);
+      activeFirestoreListeners[colName] = onSnapshot(colRef, (snapshot) => {
+        if (snapshot && !snapshot.empty) {
+          const remoteItems = [];
+          snapshot.forEach((d) => remoteItems.push({ ...d.data(), id: d.id }));
+          if (remoteItems.length > 0) {
+            saveLocalEntities(entityName, remoteItems);
+            try {
+              queryClientInstance.invalidateQueries();
+            } catch (e) {}
+          }
+        }
+      }, (err) => {
+        console.warn(`Firestore onSnapshot error for ${colName}:`, err);
+      });
+    } catch (e) {
+      console.warn(`Failed to attach listener for ${colName}:`, e);
+    }
+  });
+}
+
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    initFirestoreRealtimeSync();
+  }, 1000);
+}
 
 async function syncToFirestore(entityName, item, isDelete = false) {
   try {
@@ -207,6 +247,9 @@ export function createLocalEntityHandler(entityName, originalEntity) {
         }
       } catch (e) {}
       const items = getLocalEntities(entityName);
+      const filtered = items.filter((item) => {
+        return !Object.entries(query).every(([k, v]) => item[k] === v);
+      });
       saveLocalEntities(entityName, filtered);
       return { success: true };
     },
@@ -214,7 +257,7 @@ export function createLocalEntityHandler(entityName, originalEntity) {
 }
 
 export function exportBackupJSON() {
-  const entities = ['Service', 'Budget', 'Event', 'Cabin', 'Payment', 'Graduate', 'Setting'];
+  const entities = ['Service', 'Budget', 'Event', 'Cabin', 'CabinReservation', 'Payment', 'Graduate', 'Setting'];
   const backup = {};
   entities.forEach((ent) => {
     backup[ent] = getLocalEntities(ent);
@@ -229,8 +272,13 @@ export function importBackupJSON(jsonString) {
       Object.entries(data).forEach(([entityName, items]) => {
         if (Array.isArray(items)) {
           saveLocalEntities(entityName, items);
+          // Also sync imported items to Firestore
+          items.forEach((item) => syncToFirestore(entityName, item));
         }
       });
+      try {
+        queryClientInstance.invalidateQueries();
+      } catch (e) {}
       return true;
     }
   } catch (e) {
@@ -238,4 +286,3 @@ export function importBackupJSON(jsonString) {
   }
   return false;
 }
-
