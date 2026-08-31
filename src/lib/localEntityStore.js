@@ -25,15 +25,13 @@ export function initFirestoreRealtimeSync() {
     try {
       const colRef = collection(db, colName);
       activeFirestoreListeners[colName] = onSnapshot(colRef, (snapshot) => {
-        if (snapshot && !snapshot.empty) {
+        if (snapshot) {
           const remoteItems = [];
           snapshot.forEach((d) => remoteItems.push({ ...d.data(), id: d.id }));
-          if (remoteItems.length > 0) {
-            saveLocalEntities(entityName, remoteItems);
-            try {
-              queryClientInstance.invalidateQueries();
-            } catch (e) {}
-          }
+          saveLocalEntities(entityName, remoteItems);
+          try {
+            queryClientInstance.invalidateQueries();
+          } catch (e) {}
         }
       }, (err) => {
         console.warn(`Firestore onSnapshot error for ${colName}:`, err);
@@ -47,7 +45,7 @@ export function initFirestoreRealtimeSync() {
 if (typeof window !== 'undefined') {
   setTimeout(() => {
     initFirestoreRealtimeSync();
-  }, 1000);
+  }, 500);
 }
 
 async function syncToFirestore(entityName, item, isDelete = false) {
@@ -137,15 +135,9 @@ export function saveLocalEntities(entityName, items) {
   }
 }
 
-export function createLocalEntityHandler(entityName, originalEntity) {
+export function createLocalEntityHandler(entityName) {
   return {
     async list(sortField, limit) {
-      try {
-        if (originalEntity?.list) {
-          const res = await originalEntity.list(sortField, limit);
-          if (Array.isArray(res) && res.length > 0) return res;
-        }
-      } catch (e) {}
       let items = getLocalEntities(entityName);
       if (sortField) {
         const field = sortField.startsWith('-') ? sortField.substring(1) : sortField;
@@ -163,12 +155,6 @@ export function createLocalEntityHandler(entityName, originalEntity) {
     },
 
     async filter(query = {}) {
-      try {
-        if (originalEntity?.filter) {
-          const res = await originalEntity.filter(query);
-          if (Array.isArray(res) && res.length > 0) return res;
-        }
-      } catch (e) {}
       const items = getLocalEntities(entityName);
       return items.filter((item) => {
         return Object.entries(query).every(([k, v]) => item[k] === v);
@@ -176,27 +162,15 @@ export function createLocalEntityHandler(entityName, originalEntity) {
     },
 
     async get(id) {
-      try {
-        if (originalEntity?.get) {
-          const res = await originalEntity.get(id);
-          if (res) return res;
-        }
-      } catch (e) {}
       const items = getLocalEntities(entityName);
       return items.find((i) => String(i.id) === String(id)) || null;
     },
 
     async create(data) {
-      let created = null;
-      try {
-        if (originalEntity?.create) {
-          created = await originalEntity.create(data);
-        }
-      } catch (e) {}
       const items = getLocalEntities(entityName);
       const newEntity = {
         ...data,
-        id: created?.id || `${entityName.toLowerCase()}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        id: data.id || `${entityName.toLowerCase()}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
         created_at: new Date().toISOString(),
       };
       items.push(newEntity);
@@ -206,12 +180,6 @@ export function createLocalEntityHandler(entityName, originalEntity) {
     },
 
     async update(id, data) {
-      let updated = null;
-      try {
-        if (originalEntity?.update) {
-          updated = await originalEntity.update(id, data);
-        }
-      } catch (e) {}
       const items = getLocalEntities(entityName);
       const idx = items.findIndex((i) => String(i.id) === String(id));
       if (idx !== -1) {
@@ -228,11 +196,6 @@ export function createLocalEntityHandler(entityName, originalEntity) {
     },
 
     async delete(id) {
-      try {
-        if (originalEntity?.delete) {
-          await originalEntity.delete(id);
-        }
-      } catch (e) {}
       const items = getLocalEntities(entityName);
       const filtered = items.filter((i) => String(i.id) !== String(id));
       saveLocalEntities(entityName, filtered);
@@ -241,16 +204,11 @@ export function createLocalEntityHandler(entityName, originalEntity) {
     },
 
     async deleteMany(query = {}) {
-      try {
-        if (originalEntity?.deleteMany) {
-          await originalEntity.deleteMany(query);
-        }
-      } catch (e) {}
       const items = getLocalEntities(entityName);
-      const filtered = items.filter((item) => {
-        return !Object.entries(query).every(([k, v]) => item[k] === v);
-      });
+      const toDelete = items.filter((item) => Object.entries(query).every(([k, v]) => item[k] === v));
+      const filtered = items.filter((item) => !Object.entries(query).every(([k, v]) => item[k] === v));
       saveLocalEntities(entityName, filtered);
+      toDelete.forEach((item) => syncToFirestore(entityName, item, true));
       return { success: true };
     },
   };
@@ -272,7 +230,6 @@ export function importBackupJSON(jsonString) {
       Object.entries(data).forEach(([entityName, items]) => {
         if (Array.isArray(items)) {
           saveLocalEntities(entityName, items);
-          // Also sync imported items to Firestore
           items.forEach((item) => syncToFirestore(entityName, item));
         }
       });
