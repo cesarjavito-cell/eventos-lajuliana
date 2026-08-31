@@ -42,37 +42,7 @@ export const DEFAULT_SERVICES = [
     auto_include: false,
   },
   {
-    name: 'Pinchos / Cazuelas Gourmet',
-    description: 'Variedad de cazuelitas calientes y pinchos para la recepción.',
-    category: 'catering',
-    measurement_type: 'per_person',
-    base_price: 9500,
-    display_order: 4,
-    active: true,
-    auto_include: false,
-  },
-  {
-    name: 'Plato Principal (Parrilla / Asado Tradicional)',
-    description: 'Corte de carnes de primera calidad con ensaladas variadas y papas.',
-    category: 'catering',
-    measurement_type: 'per_person',
-    base_price: 18500,
-    display_order: 5,
-    active: true,
-    auto_include: false,
-  },
-  {
-    name: 'Postre Helado / Mesa Dulce Artesanal',
-    description: 'Postre servido y mesa dulce variada para el cierre.',
-    category: 'catering',
-    measurement_type: 'per_person',
-    base_price: 6000,
-    display_order: 6,
-    active: true,
-    auto_include: true,
-  },
-  {
-    name: 'Torta de Evento (Cálculo Especial)',
+    name: 'Torta Real + Maqueta Decorada',
     description: 'Torta temática por kilo con maqueta decorativa incluida.',
     category: 'catering',
     measurement_type: 'torta',
@@ -81,7 +51,57 @@ export const DEFAULT_SERVICES = [
     small_cake_per_kg_price: 22000,
     maqueta_price: 25000,
     large_cake_threshold: 10,
+    display_order: 4,
+    active: true,
+    auto_include: false,
+  },
+  {
+    name: 'Proyector y Pantalla Gigante',
+    description: 'Proyector HD con pantalla gigante para videos cronológicos.',
+    category: 'servicios',
+    measurement_type: 'fixed',
+    base_price: 45000,
+    display_order: 5,
+    active: true,
+    auto_include: false,
+  },
+  {
+    name: 'Sillón de 15 Años',
+    description: 'Sillón de gala especial para quinceañeras o agasajados.',
+    category: 'alquiler',
+    measurement_type: 'fixed',
+    base_price: 35000,
+    display_order: 6,
+    active: true,
+    auto_include: false,
+  },
+  {
+    name: 'Cabina Selfie / Fotomatón',
+    description: 'Cabina fotográfica interactiva con impresión de fotos en el acto.',
+    category: 'servicios',
+    measurement_type: 'fixed',
+    base_price: 65000,
     display_order: 7,
+    active: true,
+    auto_include: false,
+  },
+  {
+    name: 'Decoración & Ambientación Completa (Incluye Fondo de Torta)',
+    description: 'Decoración temática de salón, mesas y espacio de fotos.',
+    category: 'decoracion',
+    measurement_type: 'fixed',
+    base_price: 120000,
+    display_order: 8,
+    active: true,
+    auto_include: false,
+  },
+  {
+    name: 'Sillas Tiffany & Mobiliario de Gala',
+    description: 'Juego de sillas Tiffany con mesas vestidas y mantelería fina.',
+    category: 'alquiler',
+    measurement_type: 'per_person',
+    base_price: 2500,
+    display_order: 9,
     active: true,
     auto_include: false,
   },
@@ -91,17 +111,17 @@ export const DEFAULT_SERVICES = [
     category: 'bebidas',
     measurement_type: 'per_person',
     base_price: 5500,
-    display_order: 8,
+    display_order: 10,
     active: true,
     auto_include: true,
   },
   {
-    name: 'Barra de Tragos & Coctelería',
+    name: 'Barra de Tragos & Coctelería (Bartender)',
     description: 'Tragos con y sin alcohol servidos en barra ambientada.',
     category: 'bebidas',
     measurement_type: 'per_person',
     base_price: 8000,
-    display_order: 9,
+    display_order: 11,
     active: true,
     auto_include: false,
   },
@@ -111,7 +131,7 @@ export const DEFAULT_SERVICES = [
     category: 'alquiler',
     measurement_type: 'fixed',
     base_price: 450000,
-    display_order: 10,
+    display_order: 12,
     active: true,
     auto_include: true,
   },
@@ -121,18 +141,18 @@ export const DEFAULT_SERVICES = [
     category: 'servicios',
     measurement_type: 'fixed',
     base_price: 180000,
-    display_order: 11,
+    display_order: 13,
     active: true,
     auto_include: false,
   },
   {
-    name: 'Personal de Mozos y Cocina (1 cada 20 personas)',
-    description: 'Atención de mesas y coordinación de cocina.',
+    name: 'Personal de Mozos, Recepcionistas y Cocina',
+    description: 'Atención de recepción, mesas y coordinación de cocina.',
     category: 'personal',
     measurement_type: 'per_group',
     people_per_unit: 20,
     base_price: 45000,
-    display_order: 12,
+    display_order: 14,
     active: true,
     auto_include: false,
   },
@@ -146,14 +166,16 @@ export async function ensureSeedServices() {
         await base44.entities.Service.create(s);
       }
     } else {
-      // Ensure mixed menu default services exist
-      const hasMixedCatering = existing.some((s) => s.measurement_type === 'mixed_menu' && s.category === 'catering');
-      if (!hasMixedCatering) {
-        await base44.entities.Service.create(DEFAULT_SERVICES[0]);
-      }
-      const hasMixedVajilla = existing.some((s) => s.measurement_type === 'mixed_menu' && s.category === 'servicios');
-      if (!hasMixedVajilla) {
-        await base44.entities.Service.create(DEFAULT_SERVICES[1]);
+      // Ensure key services exist if missing
+      for (const defaultSvc of DEFAULT_SERVICES) {
+        const exists = existing.some((s) => {
+          const sName = (s.name || '').toLowerCase();
+          const dName = (defaultSvc.name || '').toLowerCase();
+          return sName.includes(dName.slice(0, 10)) || dName.includes(sName.slice(0, 10));
+        });
+        if (!exists) {
+          await base44.entities.Service.create(defaultSvc);
+        }
       }
     }
   } catch (e) {

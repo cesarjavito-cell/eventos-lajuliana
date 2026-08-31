@@ -51,6 +51,38 @@ const loadImageAsDataURL = (url) =>
     img.src = url;
   });
 
+function isServiceMatchedToRequest(service, reqName) {
+  if (!service || !reqName) return false;
+  const sName = String(service.name || '').toLowerCase();
+  const rName = String(reqName || '').toLowerCase();
+
+  // Direct substring match
+  if (sName.includes(rName) || rName.includes(sName)) return true;
+
+  // Key synonym rules
+  if (rName.includes('torta') && sName.includes('torta')) return true;
+  if (rName.includes('galeto') && (sName.includes('galeto') || sName.includes('menú mixto') || sName.includes('plato principal'))) return true;
+  if (rName.includes('asado') && (sName.includes('asado') || sName.includes('menú mixto') || sName.includes('plato principal'))) return true;
+  if (rName.includes('menú mixto') && (sName.includes('menú mixto') || sName.includes('vajilla y mantelería mixta'))) return true;
+  if (rName.includes('entradita') && (sName.includes('entradita') || sName.includes('finger'))) return true;
+  if (rName.includes('finger') && (sName.includes('finger') || sName.includes('entradita') || sName.includes('pincho'))) return true;
+  if (rName.includes('sillón') && (sName.includes('sillón') || sName.includes('15'))) return true;
+  if (rName.includes('proyector') && (sName.includes('proyector') || sName.includes('pantalla'))) return true;
+  if (rName.includes('cabina') && sName.includes('cabina')) return true;
+  if (rName.includes('decoración') && (sName.includes('decoración') || sName.includes('ambientación'))) return true;
+  if (rName.includes('mozos') && (sName.includes('mozos') || sName.includes('personal'))) return true;
+  if (rName.includes('recepcionista') && (sName.includes('recepcionista') || sName.includes('personal'))) return true;
+  if (rName.includes('bartender') && (sName.includes('bartender') || sName.includes('barra'))) return true;
+  if (rName.includes('tiffany') && (sName.includes('tiffany') || sName.includes('silla'))) return true;
+  if (rName.includes('mantelería') && (sName.includes('mantelería') || sName.includes('vajilla'))) return true;
+  if (rName.includes('vajilla') && (sName.includes('vajilla') || sName.includes('mantelería'))) return true;
+  if (rName.includes('dj') && (sName.includes('dj') || sName.includes('iluminación') || sName.includes('sonido'))) return true;
+
+  // Split word matching
+  const words = rName.replace(/[^a-z0-9áéíóúñ\s]/gi, '').split(/\s+/).filter((w) => w.length >= 4);
+  return words.some((w) => sName.includes(w));
+}
+
 export default function BudgetFormDialog({ budget, initialData, open, onOpenChange, onSaved }) {
   const isEdit = !!budget;
   const { user } = useAuth();
@@ -87,11 +119,7 @@ export default function BudgetFormDialog({ budget, initialData, open, onOpenChan
       const initial = {};
       const requestedServices = initialData?.preSelectedServices || [];
       sorted.forEach((s) => {
-        const isMatched = requestedServices.some((reqName) => {
-          const cleanReq = String(reqName || '').toLowerCase();
-          const cleanSvc = String(s.name || '').toLowerCase();
-          return cleanSvc.includes(cleanReq) || cleanReq.includes(cleanSvc);
-        });
+        const isMatched = requestedServices.some((reqName) => isServiceMatchedToRequest(s, reqName));
         if (s.auto_include || isMatched) {
           initial[s.id] = { selected: true, hours: 0, selectedSubOptions: [] };
         }

@@ -82,19 +82,20 @@ export default function Presupuestos() {
     ];
 
     // Map Event Type
-    let mappedType = 'general';
+    let mappedType = 'fiesta_particular';
     const typeLower = (req.event_type || '').toLowerCase();
     if (typeLower.includes('egresados')) mappedType = 'egresados';
-    else if (typeLower.includes('particular') || typeLower.includes('cumple')) mappedType = 'fiesta_particular';
     else if (typeLower.includes('empresarial') || typeLower.includes('corporativo')) mappedType = 'empresarial';
+    else mappedType = 'fiesta_particular';
 
     setConvertInitialData({
+      event_title: `${req.event_type || 'Evento'} - ${req.client_name}`,
       client_name: req.client_name,
       client_phone: req.client_phone,
       event_date: req.event_date,
       number_of_people: req.guests_count || 100,
       event_type: mappedType,
-      notes: `Solicitud Web Cliente: ${req.notes || 'Sin notas.'}\nVisita: ${req.visit_preference || 'Sin especificar'}`,
+      notes: `Solicitud Web Cliente: ${req.notes || 'Sin notas.'}\nVisita: ${req.visit_preference || 'Por el momento no, gracias'}`,
       preSelectedServices: allSelectedServices,
     });
 
