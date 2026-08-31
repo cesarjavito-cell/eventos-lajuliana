@@ -20,6 +20,7 @@ import Register from '@/pages/Register';
 import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
 import OAuthConsent from '@/pages/OAuthConsent';
+import CotizarPublic from '@/pages/CotizarPublic';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError } = useAuth();
@@ -42,6 +43,7 @@ const AuthenticatedApp = () => {
   return (
     <Routes>
       {/* Public Auth Routes */}
+      <Route path="/cotizar" element={<CotizarPublic />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />

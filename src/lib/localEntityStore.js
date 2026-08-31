@@ -17,7 +17,7 @@ export function initFirestoreRealtimeSync() {
   const { db } = getFirebaseInstance();
   if (!db) return;
 
-  const entities = ['Service', 'Budget', 'Event', 'Cabin', 'CabinReservation', 'Payment', 'Graduate', 'Setting', 'User'];
+  const entities = ['Service', 'Budget', 'Event', 'Cabin', 'CabinReservation', 'Payment', 'Graduate', 'Setting', 'User', 'QuoteRequest'];
   entities.forEach((entityName) => {
     const colName = `${entityName.toLowerCase()}s`;
     if (activeFirestoreListeners[colName]) return;
@@ -215,7 +215,7 @@ export function createLocalEntityHandler(entityName) {
 }
 
 export function exportBackupJSON() {
-  const entities = ['Service', 'Budget', 'Event', 'Cabin', 'CabinReservation', 'Payment', 'Graduate', 'Setting', 'User'];
+  const entities = ['Service', 'Budget', 'Event', 'Cabin', 'CabinReservation', 'Payment', 'Graduate', 'Setting', 'User', 'QuoteRequest'];
   const backup = {};
   entities.forEach((ent) => {
     backup[ent] = getLocalEntities(ent);

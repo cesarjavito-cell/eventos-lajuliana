@@ -51,7 +51,7 @@ const loadImageAsDataURL = (url) =>
     img.src = url;
   });
 
-export default function BudgetFormDialog({ budget, open, onOpenChange, onSaved }) {
+export default function BudgetFormDialog({ budget, initialData, open, onOpenChange, onSaved }) {
   const isEdit = !!budget;
   const { user } = useAuth();
   const [services, setServices] = useState([]);
@@ -83,17 +83,23 @@ export default function BudgetFormDialog({ budget, open, onOpenChange, onSaved }
       setServices(sorted);
       if (setData && setData.length > 0) setSettings(setData[0]);
 
-      // Pre-select auto-include services
+      // Pre-select auto-include services and matched client requested services
       const initial = {};
+      const requestedServices = initialData?.preSelectedServices || [];
       sorted.forEach((s) => {
-        if (s.auto_include) {
+        const isMatched = requestedServices.some((reqName) => {
+          const cleanReq = String(reqName || '').toLowerCase();
+          const cleanSvc = String(s.name || '').toLowerCase();
+          return cleanSvc.includes(cleanReq) || cleanReq.includes(cleanSvc);
+        });
+        if (s.auto_include || isMatched) {
           initial[s.id] = { selected: true, hours: 0, selectedSubOptions: [] };
         }
       });
       if (!budget) setSelected(initial);
     };
     if (open) load();
-  }, [open]);
+  }, [open, budget, initialData]);
 
   useEffect(() => {
     if (budget) {
@@ -118,10 +124,23 @@ export default function BudgetFormDialog({ budget, open, onOpenChange, onSaved }
         };
       });
       setSelected(sel);
+    } else if (initialData) {
+      setForm({
+        event_title: initialData.event_title || `Evento de ${initialData.client_name || 'Cliente'}`,
+        client_name: initialData.client_name || '',
+        client_phone: initialData.client_phone || '',
+        event_date: initialData.event_date || '',
+        event_type: initialData.event_type || 'general',
+        number_of_people: initialData.number_of_people || 100,
+        card_value: 0,
+        card_count: 0,
+        notes: initialData.notes || '',
+        status: 'borrador',
+      });
     } else {
-      setForm({ event_title: '', client_name: '', client_phone: '', event_date: '', event_type: 'general', number_of_people: 0, card_value: 0, card_count: 0, notes: '', status: 'borrador' });
+      setForm({ event_title: '', client_name: '', client_phone: '', event_date: '', event_type: 'general', number_of_people: 100, card_value: 0, card_count: 0, notes: '', status: 'borrador' });
     }
-  }, [budget, open]);
+  }, [budget, initialData, open]);
 
   const inflationRate = getInflationRate(form.event_date, settings);
   const isEgresados = form.event_type === 'egresados';
