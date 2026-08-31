@@ -1,16 +1,22 @@
 {
-  "name": "Quinta La Juliana - Catering & Eventos",
+  "name": "Quinta La Juliana - Eventos y Hospedaje",
   "short_name": "La Juliana",
-  "description": "Sistema oficial de gestión de catering, presupuestos, egresados y hospedaje de Quinta La Juliana.",
+  "description": "Sistema oficial de gestión de catering, eventos, presupuestos y hospedaje de Quinta La Juliana.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#ffffff",
-  "theme_color": "#6d28d9",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
   "icons": [
     {
-      "src": "/signature.png",
+      "src": "/icon.png",
       "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     }

@@ -53,9 +53,9 @@ export default function Layout() {
       >
         <div className="p-4 border-b border-[#C9A04E]/20 flex flex-col items-center">
           <img
-            src="https://media.base44.com/images/public/6a70f20332bd3ec0ab545f1c/459640b1b_9bf4ee4a-29e8-47a9-bf22-f881699a455d.jpg"
+            src="/logo.jpg"
             alt="La Juliana"
-            className="w-20 h-20 rounded-lg object-cover mb-2"
+            className="w-20 h-20 rounded-xl object-cover mb-2 border border-[#C9A04E]/30 shadow-md"
           />
           <h1 className="font-display text-base font-semibold leading-tight tracking-tight text-[#E6C57A]">LA JULIANA</h1>
           <p className="text-[10px] text-[#C9A04E]/70 mt-0.5 tracking-[0.2em] uppercase">Eventos y Hospedaje</p>
