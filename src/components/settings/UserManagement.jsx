@@ -1,104 +1,78 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { UserPlus, Mail, Shield, Trash2, AlertTriangle, MessageSquareShare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { MobileSelect } from '@/components/ui/mobile-select';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
-import { useAuth } from '@/lib/AuthContext';
+import { MobileSelect } from '@/components/ui/mobile-select';
 import { ROLE_LABELS, ROLE_DESCRIPTIONS, normalizeRole } from '@/lib/roles';
-import { buildWhatsAppUrl } from '@/lib/pricing';
+import { UserPlus, Trash2, Shield, MessageSquareShare, TestTube } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
 
 const ROLE_BADGE_STYLES = {
-  admin: 'bg-rose-100 text-rose-700 hover:bg-rose-100',
-  admin_jr: 'bg-violet-100 text-violet-700 hover:bg-violet-100',
-  comercial: 'bg-sky-100 text-sky-700 hover:bg-sky-100',
-  invitado: 'bg-stone-100 text-stone-600 hover:bg-stone-100',
+  admin: 'bg-rose-100 text-rose-800 hover:bg-rose-100',
+  admin_jr: 'bg-amber-100 text-amber-800 hover:bg-amber-100',
+  comercial: 'bg-sky-100 text-sky-800 hover:bg-sky-100',
+  invitado: 'bg-stone-100 text-stone-700 hover:bg-stone-100',
 };
 
 export default function UserManagement() {
   const { toast } = useToast();
-  const { user: currentUser } = useAuth();
+  const { user, setSimulatedRole } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [inviteForm, setInviteForm] = useState({ email: '', role: 'comercial' });
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteName, setInviteName] = useState('');
+  const [inviteRole, setInviteRole] = useState('comercial');
   const [inviting, setInviting] = useState(false);
   const [editingRole, setEditingRole] = useState({});
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
-  const handleDeleteAccount = async () => {
-    setDeleting(true);
+  const loadUsers = async () => {
+    setLoading(true);
     try {
-      if (currentUser?.id) {
-        try {
-          await base44.entities.User.delete(currentUser.id);
-        } catch (e) {}
-      }
-      await base44.auth.logout();
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const loadUsers = useCallback(async () => {
-    try {
-      const data = await base44.entities.User.list();
-      setUsers(Array.isArray(data) ? data : []);
+      const list = await base44.entities.User.list();
+      setUsers(Array.isArray(list) ? list : []);
     } catch (e) {
-      console.error(e);
+      console.warn('Error loading users:', e);
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
     loadUsers();
-  }, [loadUsers]);
+  }, []);
 
-  const handleInvite = async () => {
-    const email = inviteForm.email.trim();
-    if (!email) return;
+  const handleInvite = async (e) => {
+    e.preventDefault();
+    if (!inviteEmail.trim()) return;
     setInviting(true);
     try {
-      if (base44.users?.inviteUser) {
-        try {
-          await base44.users.inviteUser(email, inviteForm.role);
-        } catch (e) {}
-      }
-
+      const role = normalizeRole(inviteRole);
       const newUser = {
-        id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        email: email,
-        full_name: email.split('@')[0],
-        role: inviteForm.role,
-        status: 'invited',
-        created_at: new Date().toISOString()
+        id: `usr_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        email: inviteEmail.trim().toLowerCase(),
+        full_name: inviteName.trim() || inviteEmail.trim(),
+        role: role,
+        created_at: new Date().toISOString(),
       };
-
       await base44.entities.User.create(newUser);
 
       toast({
-        title: '¡Invitación registrada!',
-        description: `Se invitó a ${email} como ${ROLE_LABELS[inviteForm.role] || inviteForm.role}.`
+        title: 'Usuario registrado',
+        description: `Se asignó el rol ${ROLE_LABELS[role]} a ${inviteEmail}.`,
       });
 
-      setInviteForm({ email: '', role: 'comercial' });
       setInviteOpen(false);
+      setInviteEmail('');
+      setInviteName('');
+      setInviteRole('comercial');
       loadUsers();
     } catch (e) {
-      toast({ title: 'Error', description: e.message || 'No se pudo registrar el usuario', variant: 'destructive' });
+      toast({ title: 'Error', description: 'No se pudo registrar el usuario.', variant: 'destructive' });
     } finally {
       setInviting(false);
     }
@@ -106,17 +80,18 @@ export default function UserManagement() {
 
   const handleChangeRole = async (userId, newRole) => {
     try {
-      await base44.entities.User.update(userId, { role: newRole });
-      setEditingRole((p) => ({ ...p, [userId]: null }));
-      toast({ title: 'Rol actualizado' });
+      const role = normalizeRole(newRole);
+      await base44.entities.User.update(userId, { role });
+      toast({ title: 'Rol actualizado', description: `Nuevo rol: ${ROLE_LABELS[role]}` });
+      setEditingRole((prev) => ({ ...prev, [userId]: false }));
       loadUsers();
     } catch (e) {
-      toast({ title: 'Error', description: e.message || 'No se pudo actualizar el rol', variant: 'destructive' });
+      toast({ title: 'Error al cambiar rol', variant: 'destructive' });
     }
   };
 
-  const handleDeleteUser = async (userId, userEmail) => {
-    if (!confirm(`¿Eliminar al usuario ${userEmail || ''}?`)) return;
+  const handleDeleteUser = async (userId, email) => {
+    if (!confirm(`¿Eliminar al usuario ${email}?`)) return;
     try {
       await base44.entities.User.delete(userId);
       toast({ title: 'Usuario eliminado' });
@@ -133,8 +108,38 @@ export default function UserManagement() {
     window.open(url, '_blank');
   };
 
+  const currentEffectiveRole = normalizeRole(user?.role);
+
   return (
     <div>
+      {/* Probador / Simulador de Roles */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <TestTube className="w-5 h-5 text-amber-700 shrink-0" />
+          <div>
+            <h3 className="font-semibold text-amber-900 text-sm">Simulador de Permisos y Vistas</h3>
+            <p className="text-xs text-amber-700">Prueba cómo ve la app un usuario según su rol asignado.</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <MobileSelect
+            value={currentEffectiveRole}
+            onValueChange={(v) => {
+              if (v === 'reset') setSimulatedRole(null);
+              else setSimulatedRole(v);
+            }}
+            options={[
+              { value: 'admin', label: '👑 Administrador General' },
+              { value: 'admin_jr', label: '💼 Administrador Jr' },
+              { value: 'comercial', label: '📊 Comercial (Solo Calendario + Presupuestos)' },
+              { value: 'invitado', label: '👁️ Invitado (Solo Lectura Calendario)' },
+              { value: 'reset', label: '↺ Restaurar Rol Real' },
+            ]}
+            className="w-[240px] text-xs h-9 bg-white border-amber-300"
+          />
+        </div>
+      </div>
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <h2 className="font-semibold text-stone-700">Usuarios del sistema ({users.length})</h2>
@@ -208,69 +213,55 @@ export default function UserManagement() {
         )}
       </div>
 
-      <div className="bg-stone-50 rounded-xl border border-stone-200 p-4">
-        <h3 className="font-semibold text-stone-800 text-sm mb-1">Eliminar mi cuenta</h3>
-        <p className="text-xs text-red-600 mb-3">
-          Esta acción es permanente e irreversible. Se eliminará tu acceso a la plataforma y todos tus datos asociados. No podrás deshacer esta acción.
-        </p>
-        <Button variant="destructive" onClick={() => setDeleteOpen(true)} disabled={deleting}>
-          <Trash2 className="w-4 h-4 mr-1" /> Eliminar mi cuenta
-        </Button>
-      </div>
-
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-700">
-              <AlertTriangle className="w-5 h-5" /> Eliminar cuenta permanentemente
-            </DialogTitle>
-            <DialogDescription>
-              Esta acción no se puede deshacer. Se eliminará tu cuenta y todos los datos asociados de forma permanente. Serás desconectado inmediatamente.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleDeleteAccount} disabled={deleting}>
-              {deleting ? 'Eliminando...' : 'Sí, eliminar mi cuenta'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Mail className="w-4 h-4" /> Invitar usuario
+              <Shield className="w-5 h-5 text-[#C9A04E]" /> Invitar Nuevo Usuario
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label>Email del invitado</Label>
+          <form onSubmit={handleInvite} className="space-y-4 py-2">
+            <div>
+              <Label className="text-xs text-stone-600">Nombre del Usuario</Label>
+              <Input
+                placeholder="Ej: Laura Vendedora"
+                value={inviteName}
+                onChange={(e) => setInviteName(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-stone-600">Correo Electrónico *</Label>
               <Input
                 type="email"
-                placeholder="ejemplo@email.com"
-                value={inviteForm.email}
-                onChange={(e) => setInviteForm((p) => ({ ...p, email: e.target.value }))}
+                required
+                placeholder="usuario@ejemplo.com"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                className="mt-1"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label>Rol</Label>
+            <div>
+              <Label className="text-xs text-stone-600">Rol Asignado *</Label>
               <MobileSelect
-                value={inviteForm.role}
-                onValueChange={(v) => setInviteForm((p) => ({ ...p, role: v }))}
-                options={Object.entries(ROLE_LABELS).filter(([k]) => k !== 'user').map(([k, v]) => ({ value: k, label: v }))}
-                placeholder="Rol"
+                value={inviteRole}
+                onValueChange={setInviteRole}
+                options={Object.entries(ROLE_LABELS).filter(([k]) => k !== 'user').map(([k, v]) => ({
+                  value: k,
+                  label: `${v} - ${ROLE_DESCRIPTIONS[k] || ''}`,
+                }))}
+                className="mt-1"
               />
-              <p className="text-xs text-stone-400">{ROLE_DESCRIPTIONS[inviteForm.role]}</p>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setInviteOpen(false)}>Cancelar</Button>
-            <Button onClick={handleInvite} disabled={inviting || !inviteForm.email.trim()} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              {inviting ? 'Enviando...' : 'Enviar invitación'}
-            </Button>
-          </DialogFooter>
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={() => setInviteOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={inviting} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                {inviting ? 'Guardando...' : 'Guardar e Invitar'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

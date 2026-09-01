@@ -21,6 +21,26 @@ export const AuthProvider = ({ children }) => {
   const [authChecked, setAuthChecked] = useState(true);
   const [appPublicSettings, setAppPublicSettings] = useState(null);
 
+  const fetchAssignedUserRole = async (baseUser) => {
+    if (!baseUser || !baseUser.email) return baseUser;
+    try {
+      const userRecords = await base44.entities.User.list();
+      const match = (userRecords || []).find(
+        (u) => (u.email || '').toLowerCase().trim() === (baseUser.email || '').toLowerCase().trim()
+      );
+      if (match && match.role) {
+        return {
+          ...baseUser,
+          role: match.role,
+          full_name: match.full_name || baseUser.full_name || baseUser.email,
+        };
+      }
+    } catch (e) {
+      console.warn('Could not match assigned role from User collection:', e);
+    }
+    return baseUser;
+  };
+
   useEffect(() => {
     checkAppState();
   }, []);
@@ -29,6 +49,9 @@ export const AuthProvider = ({ children }) => {
     try {
       setIsLoadingPublicSettings(true);
       setAuthError(null);
+
+      // Check simulated user role override if stored in localStorage for testing
+      const storedSimulatedRole = localStorage.getItem('active_user_role_override');
       
       const appClient = createAxiosClient({
         baseURL: `/api/apps/public`,
@@ -46,22 +69,28 @@ export const AuthProvider = ({ children }) => {
         if (appParams.token) {
           await checkUserAuth();
         } else {
-          setUser(DEFAULT_ADMIN);
+          let active = DEFAULT_ADMIN;
+          if (storedSimulatedRole) {
+            active = { ...active, role: storedSimulatedRole };
+          }
+          setUser(active);
           setIsAuthenticated(true);
           setIsLoadingAuth(false);
           setAuthChecked(true);
         }
         setIsLoadingPublicSettings(false);
       } catch (appError) {
-        console.warn('Local/Dev mode active, using local session:', appError?.message);
-        setUser(DEFAULT_ADMIN);
+        let active = DEFAULT_ADMIN;
+        if (storedSimulatedRole) {
+          active = { ...active, role: storedSimulatedRole };
+        }
+        setUser(active);
         setIsAuthenticated(true);
         setIsLoadingPublicSettings(false);
         setIsLoadingAuth(false);
         setAuthChecked(true);
       }
     } catch (error) {
-      console.warn('Unexpected auth check error, using local session:', error?.message);
       setUser(DEFAULT_ADMIN);
       setIsAuthenticated(true);
       setIsLoadingPublicSettings(false);
@@ -74,25 +103,50 @@ export const AuthProvider = ({ children }) => {
     try {
       setIsLoadingAuth(true);
       const currentUser = await base44.auth.me();
+      const storedSimulatedRole = localStorage.getItem('active_user_role_override');
+
       if (currentUser) {
-        setUser(currentUser);
+        let matchedUser = await fetchAssignedUserRole(currentUser);
+        if (storedSimulatedRole) {
+          matchedUser = { ...matchedUser, role: storedSimulatedRole };
+        }
+        setUser(matchedUser);
         setIsAuthenticated(true);
       } else {
-        setUser(DEFAULT_ADMIN);
+        let active = DEFAULT_ADMIN;
+        if (storedSimulatedRole) {
+          active = { ...active, role: storedSimulatedRole };
+        }
+        setUser(active);
         setIsAuthenticated(true);
       }
       setIsLoadingAuth(false);
       setAuthChecked(true);
     } catch (error) {
-      console.warn('User auth check offline, using local admin:', error?.message);
-      setUser(DEFAULT_ADMIN);
+      const storedSimulatedRole = localStorage.getItem('active_user_role_override');
+      let active = DEFAULT_ADMIN;
+      if (storedSimulatedRole) {
+        active = { ...active, role: storedSimulatedRole };
+      }
+      setUser(active);
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
       setAuthChecked(true);
     }
   };
 
+  const setSimulatedRole = (role) => {
+    if (!role) {
+      localStorage.removeItem('active_user_role_override');
+      checkUserAuth();
+      return;
+    }
+    localStorage.setItem('active_user_role_override', role);
+    setUser((prev) => ({ ...prev, role }));
+  };
+
   const logout = (shouldRedirect = false) => {
+    localStorage.removeItem('active_user_role_override');
     setUser(null);
     setIsAuthenticated(false);
     try {
@@ -122,7 +176,8 @@ export const AuthProvider = ({ children }) => {
       logout,
       navigateToLogin,
       checkUserAuth,
-      checkAppState
+      checkAppState,
+      setSimulatedRole,
     }}>
       {children}
     </AuthContext.Provider>
