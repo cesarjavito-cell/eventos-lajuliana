@@ -23,6 +23,10 @@ export const AuthProvider = ({ children }) => {
 
   const fetchAssignedUserRole = async (baseUser) => {
     if (!baseUser || !baseUser.email) return baseUser;
+    // Always keep admin account as admin
+    if (baseUser.email?.toLowerCase().includes('admin')) {
+      return { ...baseUser, role: 'admin' };
+    }
     try {
       const userRecords = await base44.entities.User.list();
       const match = (userRecords || []).find(
@@ -50,9 +54,8 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingPublicSettings(true);
       setAuthError(null);
 
-      // Check simulated user role override if stored in localStorage for testing
       const storedSimulatedRole = localStorage.getItem('active_user_role_override');
-      
+
       const appClient = createAxiosClient({
         baseURL: `/api/apps/public`,
         headers: {
@@ -61,11 +64,11 @@ export const AuthProvider = ({ children }) => {
         token: appParams.token,
         interceptResponses: true
       });
-      
+
       try {
         const publicSettings = await appClient.get(`/prod/public-settings/by-id/${appParams.appId}`);
         setAppPublicSettings(publicSettings);
-        
+
         if (appParams.token) {
           await checkUserAuth();
         } else {
@@ -136,9 +139,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const setSimulatedRole = (role) => {
-    if (!role) {
+    if (!role || role === 'reset' || role === 'admin') {
       localStorage.removeItem('active_user_role_override');
-      checkUserAuth();
+      setUser(DEFAULT_ADMIN);
       return;
     }
     localStorage.setItem('active_user_role_override', role);

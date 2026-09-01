@@ -43,6 +43,11 @@ export default function Layout() {
     await base44.auth.logout();
   };
 
+  const handleReturnToAdmin = () => {
+    setSimulatedRole(null);
+    navigate('/ajustes');
+  };
+
   return (
     <div className="min-h-screen bg-[#9CA86E] flex flex-col lg:flex-row">
       {sidebarOpen && (
@@ -58,8 +63,8 @@ export default function Layout() {
           </div>
           <Button
             size="sm"
-            onClick={() => setSimulatedRole(null)}
-            className="bg-amber-500 hover:bg-amber-400 text-black font-semibold h-7 text-xs px-2.5"
+            onClick={handleReturnToAdmin}
+            className="bg-amber-500 hover:bg-amber-400 text-black font-semibold h-7 text-xs px-2.5 shadow-md"
           >
             <RotateCcw className="w-3.5 h-3.5 mr-1" /> Volver a Admin
           </Button>
