@@ -161,21 +161,11 @@ export const DEFAULT_SERVICES = [
 export async function ensureSeedServices() {
   try {
     const existing = await base44.entities.Service.list();
+    // Only seed default services if the Service collection is completely empty!
+    // Never auto-recreate services that the user explicitly deleted.
     if (!existing || existing.length === 0) {
       for (const s of DEFAULT_SERVICES) {
         await base44.entities.Service.create(s);
-      }
-    } else {
-      // Ensure key services exist if missing
-      for (const defaultSvc of DEFAULT_SERVICES) {
-        const exists = existing.some((s) => {
-          const sName = (s.name || '').toLowerCase();
-          const dName = (defaultSvc.name || '').toLowerCase();
-          return sName.includes(dName.slice(0, 10)) || dName.includes(sName.slice(0, 10));
-        });
-        if (!exists) {
-          await base44.entities.Service.create(defaultSvc);
-        }
       }
     }
   } catch (e) {
