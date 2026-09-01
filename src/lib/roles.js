@@ -15,10 +15,10 @@ export const ROLE_LABELS = {
 };
 
 export const ROLE_DESCRIPTIONS = {
-  admin: 'Modifica todos los parámetros de la organización',
-  admin_jr: 'Presupuestos, reservas, eventos, cobros y recibos. Sin acceso a Ajustes',
-  comercial: 'Calendario + generar presupuestos para enviar',
-  invitado: 'Solo visualizar el calendario de eventos',
+  admin: 'Modifica todos los parámetros y tiene acceso total al sistema',
+  admin_jr: 'Presupuestos, reservas, eventos y cabañas. Sin acceso a Ajustes',
+  comercial: 'Solo Calendario + generar y enviar presupuestos',
+  invitado: 'Solo visualizar el calendario de eventos (Modo Lectura)',
 };
 
 const PAGE_ACCESS = {
@@ -35,7 +35,9 @@ const ROLE_ALIASES = {
 };
 
 export function normalizeRole(role) {
-  return ROLE_ALIASES[role] || role;
+  if (!role) return 'admin';
+  const clean = String(role).toLowerCase().trim();
+  return ROLE_ALIASES[clean] || clean;
 }
 
 export function canAccess(role, page) {

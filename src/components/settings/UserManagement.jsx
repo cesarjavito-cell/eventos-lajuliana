@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { MobileSelect } from '@/components/ui/mobile-select';
 import { ROLE_LABELS, ROLE_DESCRIPTIONS, normalizeRole } from '@/lib/roles';
-import { UserPlus, Trash2, Shield, MessageSquareShare, TestTube } from 'lucide-react';
+import { UserPlus, Trash2, Shield, MessageSquareShare, TestTube, Eye } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 
 const ROLE_BADGE_STYLES = {
@@ -20,7 +20,7 @@ const ROLE_BADGE_STYLES = {
 
 export default function UserManagement() {
   const { toast } = useToast();
-  const { user, setSimulatedRole } = useAuth();
+  const { user, setSimulatedRole, switchActiveUserEmail } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -103,7 +103,8 @@ export default function UserManagement() {
 
   const handleSendWhatsAppInvite = (u) => {
     const roleName = ROLE_LABELS[normalizeRole(u.role)] || u.role;
-    const msg = `Hola! Te invito a ingresar al sistema de Quinta La Juliana como *${roleName}*.\n\nAccede directamente aquí:\nhttps://catering-pro-tfcv.vercel.app`;
+    const directLink = `https://catering-pro-tfcv.vercel.app/?login_email=${encodeURIComponent(u.email)}`;
+    const msg = `Hola! Te invito a ingresar al sistema de Quinta La Juliana como *${roleName}*.\n\nAccede directamente desde tu celular aquí:\n${directLink}`;
     const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
   };
@@ -172,9 +173,19 @@ export default function UserManagement() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => switchActiveUserEmail(u.email)}
+                      className="text-xs text-amber-700 border-amber-300 hover:bg-amber-50 h-8"
+                      title="Probar vista de este usuario"
+                    >
+                      <Eye className="w-3.5 h-3.5 mr-1" /> Probar vista
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => handleSendWhatsAppInvite(u)}
                       className="text-xs text-emerald-700 border-emerald-300 hover:bg-emerald-50 h-8"
-                      title="Enviar enlace por WhatsApp"
+                      title="Enviar enlace directo por WhatsApp"
                     >
                       <MessageSquareShare className="w-3.5 h-3.5 mr-1" /> Enviar por WhatsApp
                     </Button>
