@@ -192,13 +192,13 @@ export default function Ajustes() {
       <p className="text-sm text-stone-500 mb-6">Gestión de servicios, cabañas, inflación y copias de datos</p>
 
       <Tabs defaultValue="services">
-        <TabsList className="mb-4 flex flex-wrap gap-1">
-          <TabsTrigger value="services">Servicios</TabsTrigger>
-          <TabsTrigger value="inflation">Inflación</TabsTrigger>
-          <TabsTrigger value="cabins">Cabañas</TabsTrigger>
-          <TabsTrigger value="users">Usuarios</TabsTrigger>
-          <TabsTrigger value="backup">💾 Copia de Seguridad</TabsTrigger>
-          <TabsTrigger value="firebase">⚡ Sincronización Nube (Google)</TabsTrigger>
+        <TabsList className="w-full overflow-x-auto flex flex-nowrap justify-start space-x-1 p-1.5 bg-stone-100/90 rounded-xl mb-6 scrollbar-none">
+          <TabsTrigger value="services" className="shrink-0 text-xs sm:text-sm">Servicios</TabsTrigger>
+          <TabsTrigger value="inflation" className="shrink-0 text-xs sm:text-sm">Inflación</TabsTrigger>
+          <TabsTrigger value="cabins" className="shrink-0 text-xs sm:text-sm">Cabañas</TabsTrigger>
+          <TabsTrigger value="users" className="shrink-0 text-xs sm:text-sm">Usuarios</TabsTrigger>
+          <TabsTrigger value="backup" className="shrink-0 text-xs sm:text-sm">💾 Copia de Seguridad</TabsTrigger>
+          <TabsTrigger value="firebase" className="shrink-0 text-xs sm:text-sm">⚡ Sincronización Nube (Google)</TabsTrigger>
         </TabsList>
 
         <TabsContent value="services">

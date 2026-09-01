@@ -135,12 +135,12 @@ export default function UserManagement() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <h2 className="font-semibold text-stone-700">Usuarios del sistema ({users.length})</h2>
           <p className="text-xs text-stone-500 mt-0.5">Invita usuarios y asigna roles para controlar los permisos de acceso.</p>
         </div>
-        <Button onClick={() => setInviteOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+        <Button onClick={() => setInviteOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0">
           <UserPlus className="w-4 h-4 mr-1" /> Invitar usuario
         </Button>
       </div>
@@ -156,14 +156,14 @@ export default function UserManagement() {
               const role = normalizeRole(u.role);
               const isEditing = editingRole[u.id];
               return (
-                <div key={u.id || Math.random()} className="flex items-center justify-between p-4 hover:bg-stone-50">
+                <div key={u.id || Math.random()} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 hover:bg-stone-50">
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm text-stone-800">{u.full_name || u.email}</span>
                       {u.full_name && <span className="text-xs text-stone-400">({u.email})</span>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 flex-wrap shrink-0">
                     <Button
                       variant="outline"
                       size="sm"
