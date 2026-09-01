@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { Calendar, FileText, Settings, PartyPopper, Home, Menu, LogOut, ArrowLeft } from 'lucide-react';
+import { Calendar, FileText, Settings, PartyPopper, Home, Menu, LogOut, ArrowLeft, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -28,7 +28,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, setSimulatedRole } = useAuth();
   const hasDialogOpen = searchParams.toString() !== '';
   const canGoBack = window.history.length > 1;
   const showBackButton = hasDialogOpen || canGoBack;
@@ -36,14 +36,34 @@ export default function Layout() {
   const visibleItems = navItems.filter((item) => canAccess(user?.role, item.page));
   const pageTitle = PAGE_TITLES[location.pathname] || 'La Juliana';
 
+  const isSimulatingRole = !!localStorage.getItem('active_user_role_override');
+
   const handleLogout = async () => {
+    localStorage.removeItem('active_user_role_override');
     await base44.auth.logout();
   };
 
   return (
-    <div className="min-h-screen bg-[#9CA86E] flex">
+    <div className="min-h-screen bg-[#9CA86E] flex flex-col lg:flex-row">
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/40 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      {/* Banner de Modo Prueba cuando se simula un rol */}
+      {isSimulatingRole && (
+        <div className="bg-stone-900 text-stone-100 text-xs px-4 py-2 flex items-center justify-between border-b border-amber-500/40 z-50 fixed top-0 left-0 right-0 lg:sticky">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            <span>Modo Prueba: <strong>{ROLE_LABELS[userRole] || userRole}</strong></span>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => setSimulatedRole(null)}
+            className="bg-amber-500 hover:bg-amber-400 text-black font-semibold h-7 text-xs px-2.5"
+          >
+            <RotateCcw className="w-3.5 h-3.5 mr-1" /> Volver a Admin
+          </Button>
+        </div>
       )}
 
       <aside
@@ -96,7 +116,7 @@ export default function Layout() {
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className={`flex-1 flex flex-col min-w-0 ${isSimulatingRole ? 'pt-10 lg:pt-0' : ''}`}>
         <header
           className="lg:hidden sticky top-0 bg-white/95 backdrop-blur-sm border-b border-stone-200 z-20 px-4 flex items-center justify-between"
           style={{ paddingTop: 'max(env(safe-area-inset-top), 0.75rem)', paddingBottom: '0.75rem' }}
