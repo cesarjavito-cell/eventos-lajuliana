@@ -439,9 +439,19 @@ async function generateEgresadosContractPdf({ event, contractData = {}, services
   doc.addPage();
   y = 22;
 
+function numberToSpanishWordSmall(num) {
+  const words = {
+    1: 'una', 2: 'dos', 3: 'tres', 4: 'cuatro', 5: 'cinco',
+    6: 'seis', 7: 'siete', 8: 'ocho', 9: 'nueve', 10: 'diez',
+    12: 'doce', 15: 'quince', 20: 'veinte'
+  };
+  return words[num] || `${num}`;
+}
+
   // TERCERA
+  const advanceWord = numberToSpanishWordSmall(advanceCardsCount);
   const cl3 = `TERCERA.- El costo total que “EL LOCATARIO” debe solventar por la prestación del servicio es el estipulado para 50 personas, en caso de no cumplimentar con esta cláusula el Locador tendrá el derecho de suspender el evento o realizarla en espacios más pequeños (Salón VIP, para menor cantidad de personas). En caso que el evento no se desarrolle les será devuelto el dinero que hasta el momento el locatario haya abonado, Dicho costo será cubierto por “EL LOCATARIO” en dinero en efectivo o virtual, en moneda nacional y en la forma siguiente:
-a) A la firma del presente contrato, por concepto de anticipo, la suma PARCIAL de las ${advanceCardsCount} (seis) tarjetas de egresados.-
+a) A la firma del presente contrato, por concepto de anticipo, la suma PARCIAL de las ${advanceCardsCount} (${advanceWord}) tarjetas de egresados.-
 b) El monto restante se ajustará a la venta de tarjetas y deberá cancelarse hasta 10 días antes del evento.
 “EL LOCATARIO” se obliga a depositar la suma de ${formatCurrency(depositAmount)} pesos (antes del inicio del evento), para garantizar el pago de los servicios excedentes, imprevistos daños o perjuicios en su caso. Dicho depósito será devuelto al cliente si al finalizar el evento no se verificó ninguno de esos supuestos (OPCIONAL).-
 Independientemente de la entrega o no de anticipo “EL LOCADOR” deberá entregar al “LOCATARIO” el recibo o comprobante que ampare el pago de los servicios contratados, en la que hará constar detalladamente el nombre y el precio de cada uno de los servicios proporcionados, esto con la finalidad de que el consumidor pueda verificar en detalle.`;

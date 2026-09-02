@@ -82,7 +82,7 @@ export default function ContractFormDialog({
         // Egresados
         school_name: existing.school_name || event.title || 'E.P.E.T. N° 1 – Informática',
         card_value: existing.card_value || event.card_value || 170000,
-        after_card_value: existing.after_card_value || 60000,
+        after_card_value: existing.after_card_value || event.after_card_value || event.card_value_after || event.trasnochador_card_value || 60000,
         cutoff_date: existing.cutoff_date || defaultCutoff,
         ticket_sales_close_date: existing.ticket_sales_close_date || defaultSalesClose,
         after_date: existing.after_date || defaultAfter,
