@@ -1,9 +1,10 @@
 import { jsPDF } from 'jspdf';
 import { formatCurrency, formatDate } from './pricing';
+import { DANIEL_LASCURAIN_SIGNATURE } from './signature';
 
 /**
  * Generates and downloads an official PDF Service Location Contract for Quinta La Juliana.
- * Dynamically renders only the contracted services and corresponding personnel affected.
+ * Dynamically renders contracted services, filtered personnel affected, and Daniel Lascurain's official signature.
  */
 export async function generateContractPdf({ event, contractData = {}, servicesToShow = [], settings = {} }) {
   const doc = new jsPDF();
@@ -275,12 +276,12 @@ export async function generateContractPdf({ event, contractData = {}, servicesTo
   const closingLines = doc.splitTextToSize(closingText, 182);
   doc.setFont(undefined, 'bold');
   doc.text(closingLines, 14, y);
-  y += closingLines.length * 4.5 + 18;
+  y += closingLines.length * 4.5 + 24;
 
   // Signatures Section
-  if (y > 235) {
+  if (y > 230) {
     doc.addPage();
-    y = 30;
+    y = 35;
   }
 
   doc.setFontSize(9);
@@ -295,7 +296,15 @@ export async function generateContractPdf({ event, contractData = {}, servicesTo
   doc.setFont(undefined, 'normal');
   doc.text(`DNI: ${clientDni}`, 52.5, y + 14, { align: 'center' });
 
-  // Right Signature: LOCADOR (Daniel Oscar Lascurain)
+  // Right Signature: LOCADOR (Daniel Oscar Lascurain) - WITH OFFICIAL SIGNATURE IMAGE
+  if (DANIEL_LASCURAIN_SIGNATURE) {
+    try {
+      doc.addImage(DANIEL_LASCURAIN_SIGNATURE, 'PNG', 132, y - 18, 52, 17);
+    } catch (e) {
+      console.warn('Could not render Lascurain signature image:', e);
+    }
+  }
+
   doc.line(125, y, 190, y);
   doc.text('LOCADOR (QUINTA LA JULIANA)', 157.5, y + 5, { align: 'center' });
   doc.setFont(undefined, 'bold');
