@@ -3,7 +3,7 @@ import { formatCurrency, formatDate } from './pricing';
 
 /**
  * Generates and downloads an Egresados Ticket Audit & Collection PDF Report.
- * Clean, modern header without "PROPUESTA" banner.
+ * Clean, modern header without "PROPUESTA" banner, with graduates sorted alphabetically.
  */
 export async function generateEgresadosReportPdf({ event, graduates = [], payments = [], settings }) {
   const quintaName = settings?.quinta_name || 'Quinta La Juliana';
@@ -53,6 +53,11 @@ export async function generateEgresadosReportPdf({ event, graduates = [], paymen
   doc.text(subtitle, 20, y + 16);
   y += 28;
 
+  // Sort graduates alphabetically by student name
+  const sortedGraduates = [...graduates].sort((a, b) =>
+    (a.name || '').localeCompare(b.name || '', 'es', { sensitivity: 'base' })
+  );
+
   // Aggregated Summary
   let totalRecaudado = 0;
   let totalAdultos = 0;
@@ -60,7 +65,7 @@ export async function generateEgresadosReportPdf({ event, graduates = [], paymen
   let totalSinCargo5 = 0;
   let totalCUD = 0;
 
-  graduates.forEach((g) => {
+  sortedGraduates.forEach((g) => {
     totalRecaudado += Number(g.paid_amount || 0);
     totalAdultos += Number(g.adult_cards || 0);
     totalMenores50 += Number(g.half_cards || 0);
@@ -86,10 +91,10 @@ export async function generateEgresadosReportPdf({ event, graduates = [], paymen
   doc.setFontSize(10);
   doc.setFont(undefined, 'bold');
   doc.setTextColor(...violetDark);
-  doc.text('Planilla por Alumno / Egresado', 14, y);
+  doc.text('Planilla por Alumno / Egresado (Orden Alfabetico)', 14, y);
   doc.setDrawColor(...violet);
   doc.setLineWidth(0.5);
-  doc.line(14, y + 2, 85, y + 2);
+  doc.line(14, y + 2, 95, y + 2);
   y += 7;
 
   // Table Column Titles
@@ -111,7 +116,7 @@ export async function generateEgresadosReportPdf({ event, graduates = [], paymen
 
   const cudBeneficiaries = [];
 
-  graduates.forEach((g, idx) => {
+  sortedGraduates.forEach((g, idx) => {
     if (y > 270) {
       doc.addPage();
       y = 20;
@@ -224,7 +229,6 @@ export async function generateEgresadosReportPdf({ event, graduates = [], paymen
 
 /**
  * Generates and downloads an individual PDF Account Statement for a single Graduate.
- * Clean header without "PROPUESTA" banner.
  */
 export async function generateIndividualGraduatePdf({ event, graduate, payments = [], settings }) {
   const quintaName = settings?.quinta_name || 'Quinta La Juliana';
@@ -237,7 +241,7 @@ export async function generateIndividualGraduatePdf({ event, graduate, payments 
   const ink = [51, 51, 51];
   const muted = [120, 120, 120];
 
-  // ===== Header Banner Vector Elegante (Sin marca "PROPUESTA") =====
+  // ===== Header Banner Vector Elegante =====
   doc.setFillColor(15, 15, 15);
   doc.rect(0, 0, 210, 32, 'F');
 

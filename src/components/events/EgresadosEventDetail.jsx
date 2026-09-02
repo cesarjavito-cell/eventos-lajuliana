@@ -151,8 +151,13 @@ export default function EgresadosEventDetail({
   const plazasPagasEquiv = totalAdultos + totalMenores50 * 0.5;
   const servicesToShow = event?.selected_services?.length > 0 ? event.selected_services : budgetServices;
 
+  // Sort graduates ALPHABETICALLY by student name
+  const sortedGraduates = [...graduates].sort((a, b) =>
+    (a.name || '').localeCompare(b.name || '', 'es', { sensitivity: 'base' })
+  );
+
   // Filtered Graduates based on search
-  const filteredGraduates = graduates.filter((g) => {
+  const filteredGraduates = sortedGraduates.filter((g) => {
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase().trim();
     const matchName = (g.name || '').toLowerCase().includes(term);
@@ -416,7 +421,7 @@ export default function EgresadosEventDetail({
 
   const handleExportPDFReport = async () => {
     try {
-      await generateEgresadosReportPdf({ event, graduates, payments });
+      await generateEgresadosReportPdf({ event, graduates: sortedGraduates, payments });
       toast({ title: 'Informe PDF de tarjetas generado' });
     } catch (e) {
       console.error(e);
@@ -532,7 +537,7 @@ export default function EgresadosEventDetail({
               <CreditCard className="w-5 h-5 text-amber-300" /> Detalles de Pagos y Cuentas de Egresados
             </h3>
             <p className="text-xs text-violet-200 mt-0.5">
-              Abre el gestor completo con buscador en vivo, resumen digital en pantalla e impresión PDF por alumno.
+              Lista ordenada alfabéticamente con buscador en vivo, resumen digital en pantalla e impresión PDF.
             </p>
           </div>
           <Badge className="bg-white/20 text-white font-bold text-xs py-1 px-3">
@@ -658,7 +663,7 @@ export default function EgresadosEventDetail({
             </div>
           )}
 
-          {/* LISTA DE EGRESADOS FILTRADA CON BUSCADOR */}
+          {/* LISTA DE EGRESADOS FILTRADA Y ORDENADA ALFABETICAMENTE */}
           <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
             {loading ? (
               <p className="text-sm text-stone-400 text-center py-6">Cargando cuentas...</p>
