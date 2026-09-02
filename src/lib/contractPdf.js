@@ -3,7 +3,7 @@ import { formatCurrency, formatDate } from './pricing';
 
 /**
  * Generates and downloads an official PDF Service Location Contract for Quinta La Juliana.
- * Dynamically renders the services checked/selected during event registration.
+ * Dynamically renders only the contracted services and corresponding personnel affected.
  */
 export async function generateContractPdf({ event, contractData = {}, servicesToShow = [], settings = {} }) {
   const doc = new jsPDF();
@@ -148,35 +148,62 @@ export async function generateContractPdf({ event, contractData = {}, servicesTo
   }
   y += 4;
 
-  // Personal Afectado
-  doc.setFontSize(9.5);
-  doc.setFont(undefined, 'bold');
-  doc.setTextColor(...violetDark);
-  doc.text('PERSONAL AFECTADO AL EVENTO:', 14, y);
-  y += 5;
+  // DYNAMIC PERSONAL AFECTADO (Strictly derived from contracted services tildados)
+  const staffList = [];
 
-  const staffList = [
-    'Limpieza: SI',
-    'DJ: SI',
-    'Decoración: SI',
-    'Parrilleros: SI',
-    'Cheff: SI',
-    'Mozos: SI (Según cantidad de comensales)',
-    'Responsable del Evento: SI',
-    'Coordinador y Recepción: SI',
-    'Torta y Mesa de Dulces: SI',
-    'Personal de Limpieza (Al finalizar el Evento): SI',
-  ];
+  const hasService = (keyword) => {
+    const kw = keyword.toLowerCase();
+    return contractedList.some((s) => {
+      const name = (s.service_name || s.name || '').toLowerCase();
+      const cat = (s.category || '').toLowerCase();
+      return name.includes(kw) || cat.includes(kw);
+    });
+  };
 
-  doc.setFontSize(8.5);
-  doc.setFont(undefined, 'normal');
-  doc.setTextColor(...ink);
+  if (hasService('limpieza')) {
+    staffList.push('Personal de Limpieza: SI');
+  }
+  if (hasService('dj') || hasService('sonido') || hasService('luces') || hasService('musica')) {
+    staffList.push('DJ / Operador de Sonido: SI');
+  }
+  if (hasService('decorac') || hasService('ambientac')) {
+    staffList.push('Personal de Decoración: SI');
+  }
+  if (hasService('parrilla') || hasService('parrillero')) {
+    staffList.push('Servicio de Parrilleros: SI');
+  }
+  if (hasService('catering') || hasService('comida') || hasService('gastronom') || hasService('menu') || hasService('galeto')) {
+    staffList.push('Cheff y Personal de Cocina: SI');
+    staffList.push('Mozos: SI (Según cantidad de comensales)');
+  }
+  if (hasService('mozo') && !staffList.some((s) => s.includes('Mozos'))) {
+    staffList.push('Mozos: SI');
+  }
+  if (hasService('torta') || hasService('dulce') || hasService('postre')) {
+    staffList.push('Personal de Torta y Mesa de Dulces: SI');
+  }
+  if (hasService('coordin') || hasService('recep') || hasService('responsable')) {
+    staffList.push('Coordinador / Responsable del Evento: SI');
+  }
 
-  staffList.forEach((st) => {
-    doc.text(`• ${st}`, 18, y);
-    y += 4.5;
-  });
-  y += 6;
+  // Only render PERSONAL AFECTADO block if matching staff services are contracted!
+  if (staffList.length > 0) {
+    doc.setFontSize(9.5);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(...violetDark);
+    doc.text('PERSONAL AFECTADO AL EVENTO:', 14, y);
+    y += 5;
+
+    doc.setFontSize(8.5);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(...ink);
+
+    staffList.forEach((st) => {
+      doc.text(`• ${st}`, 18, y);
+      y += 4.5;
+    });
+    y += 6;
+  }
 
   // ===== PAGE 2 =====
   doc.addPage();
