@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Printer, Save, Calendar, User, Phone, MapPin, Users, DollarSign, Clock } from 'lucide-react';
+import { FileText, Printer, Save, Calendar, User, Phone, MapPin, Users, DollarSign, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ export default function ContractFormDialog({
   open,
   onOpenChange,
   event,
+  servicesToShow = [],
   settings,
   onSaveContract,
 }) {
@@ -79,7 +80,7 @@ export default function ContractFormDialog({
     }
     await onSaveContract(formData);
     try {
-      await generateContractPdf({ event, contractData: formData, settings });
+      await generateContractPdf({ event, contractData: formData, servicesToShow, settings });
       toast({ title: 'Contrato PDF generado con éxito' });
       onOpenChange(false);
     } catch (err) {
@@ -89,6 +90,12 @@ export default function ContractFormDialog({
   };
 
   if (!event) return null;
+
+  const actualServices = servicesToShow && servicesToShow.length > 0
+    ? servicesToShow
+    : (event?.selected_services && event.selected_services.length > 0)
+      ? event.selected_services
+      : [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -101,6 +108,24 @@ export default function ContractFormDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2 text-xs">
+          {/* Preview of Services Tildados en el Registro */}
+          <div className="bg-violet-50/80 border border-violet-200 rounded-xl p-3.5 space-y-2">
+            <h4 className="font-semibold text-violet-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-violet-600" /> Servicios Contratados en el Registro ({actualServices.length})
+            </h4>
+            {actualServices.length === 0 ? (
+              <p className="text-stone-500 italic">No se registran servicios específicos tildados (se incluirán los servicios base por defecto).</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {actualServices.map((s, idx) => (
+                  <Badge key={idx} className="bg-white text-violet-900 border border-violet-300 font-medium text-[11px] py-1 px-2.5 shadow-xs">
+                    ✓ {s.service_name || s.name}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Seccion 1: Datos del Cliente */}
           <div className="bg-stone-50 border border-stone-200 rounded-xl p-3.5 space-y-3">
             <h4 className="font-semibold text-stone-800 text-xs uppercase tracking-wider flex items-center gap-1.5">

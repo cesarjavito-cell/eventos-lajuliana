@@ -80,7 +80,7 @@ export default function EventDetailDialog({ event, open, onOpenChange, onEventUp
       return;
     }
     try {
-      await generateContractPdf({ event, contractData: event.contract_data, settings });
+      await generateContractPdf({ event, contractData: event.contract_data, servicesToShow, settings });
       toast({ title: 'Contrato PDF generado con éxito' });
     } catch (err) {
       console.error(err);
@@ -318,6 +318,7 @@ export default function EventDetailDialog({ event, open, onOpenChange, onEventUp
         open={contractModalOpen}
         onOpenChange={setContractModalOpen}
         event={event}
+        servicesToShow={servicesToShow}
         settings={settings}
         onSaveContract={handleSaveContract}
       />

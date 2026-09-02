@@ -3,9 +3,9 @@ import { formatCurrency, formatDate } from './pricing';
 
 /**
  * Generates and downloads an official PDF Service Location Contract for Quinta La Juliana.
- * Includes full legal terms, services checklist, guest vs diner breakdown, and official signatures.
+ * Dynamically renders the services checked/selected during event registration.
  */
-export async function generateContractPdf({ event, contractData = {}, settings = {} }) {
+export async function generateContractPdf({ event, contractData = {}, servicesToShow = [], settings = {} }) {
   const doc = new jsPDF();
 
   const quintaName = settings?.quinta_name || 'Quinta La Juliana';
@@ -96,29 +96,56 @@ export async function generateContractPdf({ event, contractData = {}, settings =
   doc.line(14, y + 1.5, 110, y + 1.5);
   y += 7;
 
-  // Checklist of Services
-  const servicesList = [
-    { label: 'Baños con insumos', status: 'SI' },
-    { label: 'Salón VIP, Sector Pista, Salón Principal', status: 'SI' },
-    { label: 'Servicio de Parrilleros', status: 'SI' },
-    { label: 'Sonido y Luces', status: 'SI' },
-    { label: 'Vajillas, Mobiliario y Mantelería Completas', status: 'SI' },
-    { label: 'Fotografía / Video', status: 'NO' },
-    { label: 'Catering (Entraditas variadas + Plato Principal)', status: 'SI' },
-    { label: 'Bebidas incluidas', status: 'NO' },
-  ];
-
+  // DYNAMIC CONTRACTED SERVICES CHECKLIST
   doc.setFontSize(8.5);
   doc.setFont(undefined, 'normal');
   doc.setTextColor(...ink);
 
-  servicesList.forEach((s) => {
-    doc.text(`• ${s.label}:`, 18, y);
-    doc.setFont(undefined, 'bold');
-    doc.text(`– ${s.status} –`, 140, y);
-    doc.setFont(undefined, 'normal');
-    y += 5;
-  });
+  const contractedList = (servicesToShow && servicesToShow.length > 0)
+    ? servicesToShow
+    : (event?.selected_services && event.selected_services.length > 0)
+      ? event.selected_services
+      : [];
+
+  if (contractedList.length > 0) {
+    contractedList.forEach((s) => {
+      let subDetails = '';
+      if (Array.isArray(s.selected_sub_options) && s.selected_sub_options.length > 0) {
+        subDetails = s.selected_sub_options.join(', ');
+      } else if (s.sub_option_counts && Object.keys(s.sub_option_counts).length > 0) {
+        subDetails = Object.entries(s.sub_option_counts)
+          .filter(([_, count]) => Number(count) > 0)
+          .map(([name, count]) => `${count} pers. ${name}`)
+          .join(' · ');
+      }
+
+      const serviceTitle = s.service_name || s.name || 'Servicio Contratado';
+      const labelText = subDetails ? `${serviceTitle} (${subDetails})` : serviceTitle;
+      const lines = doc.splitTextToSize(`• ${labelText}:`, 150);
+      doc.text(lines, 18, y);
+      doc.setFont(undefined, 'bold');
+      doc.text('– SI –', 190, y, { align: 'right' });
+      doc.setFont(undefined, 'normal');
+      y += lines.length * 4.5 + 1.5;
+    });
+  } else {
+    // Default fallback services if none registered yet
+    const defaultServices = [
+      'Baños con insumos',
+      'Salón Vip, Sector Pista, Salón Principal',
+      'Servicio de Parrilleros',
+      'Sonido y Luces',
+      'Vajillas, Mobiliario y Mantelería Completas',
+      'Servicio de Catering',
+    ];
+    defaultServices.forEach((name) => {
+      doc.text(`• ${name}:`, 18, y);
+      doc.setFont(undefined, 'bold');
+      doc.text('– SI –', 190, y, { align: 'right' });
+      doc.setFont(undefined, 'normal');
+      y += 5.5;
+    });
+  }
   y += 4;
 
   // Personal Afectado
