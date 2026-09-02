@@ -1,29 +1,9 @@
 import { jsPDF } from 'jspdf';
 import { formatCurrency, formatDate } from './pricing';
 
-const HEADER_IMAGE_URL = 'https://media.base44.com/images/public/6a70f20332bd3ec0ab545f1c/c60663606_WhatsAppImage2026-08-04at104612.jpg';
-
-const loadImageAsDataURL = (url) =>
-  new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      canvas.getContext('2d').drawImage(img, 0, 0);
-      try {
-        resolve({ dataUrl: canvas.toDataURL('image/jpeg', 0.92), ratio: img.naturalWidth / img.naturalHeight });
-      } catch (e) {
-        reject(e);
-      }
-    };
-    img.onerror = reject;
-    img.src = url;
-  });
-
 /**
  * Generates and downloads an Egresados Ticket Audit & Collection PDF Report.
+ * Clean, modern header without "PROPUESTA" banner.
  */
 export async function generateEgresadosReportPdf({ event, graduates = [], payments = [], settings }) {
   const quintaName = settings?.quinta_name || 'Quinta La Juliana';
@@ -38,33 +18,35 @@ export async function generateEgresadosReportPdf({ event, graduates = [], paymen
   const ink = [51, 51, 51];
   const muted = [120, 120, 120];
 
-  // Header Image
-  let headerHeight = 38;
-  try {
-    const loaded = await loadImageAsDataURL(HEADER_IMAGE_URL);
-    headerHeight = Math.min(210 / loaded.ratio, 45);
-    doc.addImage(loaded.dataUrl, 'JPEG', 0, 0, 210, headerHeight);
-  } catch (e) {
-    doc.setFillColor(...violetDark);
-    doc.rect(0, 0, 210, 32, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
-    doc.setFont(undefined, 'bold');
-    doc.text(quintaName, 105, 16, { align: 'center' });
-    headerHeight = 32;
-  }
+  // ===== Header Banner Vector Elegante (Sin marca "PROPUESTA") =====
+  doc.setFillColor(15, 15, 15);
+  doc.rect(0, 0, 210, 32, 'F');
 
-  let y = headerHeight + 6;
+  // Gold accent bar
+  doc.setFillColor(201, 160, 78); // #C9A04E
+  doc.rect(0, 31, 210, 1.5, 'F');
+
+  doc.setTextColor(230, 197, 122); // #E6C57A
+  doc.setFontSize(16);
+  doc.setFont(undefined, 'bold');
+  doc.text('QUINTA LA JULIANA', 14, 14);
+
+  doc.setTextColor(200, 200, 200);
+  doc.setFontSize(8.5);
+  doc.setFont(undefined, 'normal');
+  doc.text('EVENTOS Y HOSPEDAJE  ·  REPORTE DE COBRANZAS Y TARJETAS DE EGRESADOS', 14, 22);
+
+  let y = 38;
 
   // Title Box
   doc.setFillColor(...cream);
   doc.roundedRect(14, y, 182, 22, 3, 3, 'F');
   doc.setTextColor(...violetDark);
-  doc.setFontSize(14);
+  doc.setFontSize(13);
   doc.setFont(undefined, 'bold');
   doc.text('ESTADO DE TARJETAS Y COBRANZAS DE EGRESADOS', 20, y + 8);
 
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setFont(undefined, 'normal');
   doc.setTextColor(...ink);
   const subtitle = `Evento / Colegio: ${event.title}  ·  Fecha: ${formatDate(event.start_date)}  ·  Valor Tarjeta: ${formatCurrency(cardValue)}`;
@@ -242,10 +224,11 @@ export async function generateEgresadosReportPdf({ event, graduates = [], paymen
 
 /**
  * Generates and downloads an individual PDF Account Statement for a single Graduate.
+ * Clean header without "PROPUESTA" banner.
  */
 export async function generateIndividualGraduatePdf({ event, graduate, payments = [], settings }) {
   const quintaName = settings?.quinta_name || 'Quinta La Juliana';
-  const quintaPhone = settings?.quinta_phone || 'Contacto: +54 9 351 123-4567';
+  const quintaPhone = settings?.quinta_phone || 'Contacto: Quinta La Juliana';
   const cardValue = event?.card_value || 0;
   const doc = new jsPDF();
 
@@ -254,33 +237,35 @@ export async function generateIndividualGraduatePdf({ event, graduate, payments 
   const ink = [51, 51, 51];
   const muted = [120, 120, 120];
 
-  // Header Image
-  let headerHeight = 38;
-  try {
-    const loaded = await loadImageAsDataURL(HEADER_IMAGE_URL);
-    headerHeight = Math.min(210 / loaded.ratio, 45);
-    doc.addImage(loaded.dataUrl, 'JPEG', 0, 0, 210, headerHeight);
-  } catch (e) {
-    doc.setFillColor(...violetDark);
-    doc.rect(0, 0, 210, 32, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
-    doc.setFont(undefined, 'bold');
-    doc.text(quintaName, 105, 16, { align: 'center' });
-    headerHeight = 32;
-  }
+  // ===== Header Banner Vector Elegante (Sin marca "PROPUESTA") =====
+  doc.setFillColor(15, 15, 15);
+  doc.rect(0, 0, 210, 32, 'F');
 
-  let y = headerHeight + 8;
+  // Gold accent bar
+  doc.setFillColor(201, 160, 78); // #C9A04E
+  doc.rect(0, 31, 210, 1.5, 'F');
+
+  doc.setTextColor(230, 197, 122); // #E6C57A
+  doc.setFontSize(16);
+  doc.setFont(undefined, 'bold');
+  doc.text('QUINTA LA JULIANA', 14, 14);
+
+  doc.setTextColor(200, 200, 200);
+  doc.setFontSize(8.5);
+  doc.setFont(undefined, 'normal');
+  doc.text('EVENTOS Y HOSPEDAJE  ·  ESTADO DE CUENTA INDIVIDUAL DE EGRESADO', 14, 22);
+
+  let y = 38;
 
   // Title Card
   doc.setFillColor(...cream);
   doc.roundedRect(14, y, 182, 22, 3, 3, 'F');
   doc.setTextColor(...violetDark);
-  doc.setFontSize(14);
+  doc.setFontSize(13);
   doc.setFont(undefined, 'bold');
-  doc.text('ESTADO DE CUENTA Y COMPROBANTE DE EGRESADO', 20, y + 8);
+  doc.text('COMPROBANTE Y ESTADO DE CUENTA DE EGRESADO', 20, y + 8);
 
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setFont(undefined, 'normal');
   doc.setTextColor(...ink);
   doc.text(`Evento / Colegio: ${event?.title || 'Fiesta de Egresados'}  ·  Fecha: ${formatDate(event?.start_date)}`, 20, y + 16);
@@ -306,7 +291,7 @@ export async function generateIndividualGraduatePdf({ event, graduate, payments 
   doc.setTextColor(...violetDark);
   doc.text(`Egresado / Alumno: ${graduate?.name || 'Estudiante'}`, 20, y + 8);
 
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setFont(undefined, 'normal');
   doc.setTextColor(...ink);
   if (graduate?.phone) {
@@ -382,7 +367,7 @@ export async function generateIndividualGraduatePdf({ event, graduate, payments 
   doc.setDrawColor(216, 180, 254);
   doc.roundedRect(14, y, 182, 28, 3, 3, 'FD');
 
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setFont(undefined, 'normal');
   doc.setTextColor(...ink);
   doc.text(`Costo Total de Tarjetas Solicitadas:`, 20, y + 8);
@@ -398,7 +383,7 @@ export async function generateIndividualGraduatePdf({ event, graduate, payments 
   doc.setDrawColor(200, 190, 220);
   doc.line(20, y + 18, 190, y + 18);
 
-  doc.setFontSize(10);
+  doc.setFontSize(9.5);
   doc.setFont(undefined, 'bold');
   if (balanceAmt > 0) {
     doc.setTextColor(180, 83, 9);
@@ -411,7 +396,7 @@ export async function generateIndividualGraduatePdf({ event, graduate, payments 
   }
 
   // Signature / Stamp section
-  y += 40;
+  y += 38;
   doc.setDrawColor(180, 180, 180);
   doc.line(130, y, 190, y);
   doc.setFontSize(8);

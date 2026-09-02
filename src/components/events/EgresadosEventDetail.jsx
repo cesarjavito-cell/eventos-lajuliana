@@ -11,8 +11,8 @@ import {
   Check,
   Search,
   CreditCard,
-  UserCheck,
-  FileSpreadsheet,
+  Eye,
+  Send,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,6 +50,9 @@ export default function EgresadosEventDetail({
 
   // Search Filter in Payments Modal
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Digital Account Statement On-Screen Modal State
+  const [previewGrad, setPreviewGrad] = useState(null);
 
   // Card Value Quick Edit
   const [editingCardValue, setEditingCardValue] = useState(false);
@@ -363,6 +366,28 @@ export default function EgresadosEventDetail({
     window.open(`https://wa.me/${(grad.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
+  const handleSendWhatsAppStatement = (grad) => {
+    const adultC = Number(grad?.adult_cards || 0);
+    const halfC = Number(grad?.half_cards || 0);
+    const totalAmt = (adultC * cardValue) + (halfC * cardValue * 0.5);
+    const paidAmt = Number(grad?.paid_amount || 0);
+    const balanceAmt = totalAmt - paidAmt;
+
+    let msg = `*RESUMEN Y ESTADO DE CUENTA DE EGRESADO*\n*Quinta La Juliana*\n\n`;
+    msg += `🎓 *Alumno:* ${grad.name}\n`;
+    msg += `🏫 *Evento:* ${event.title}\n`;
+    msg += `📅 *Fecha:* ${formatDate(event.start_date)}\n\n`;
+    msg += `💳 *Tarjetas:* ${adultC} Adultos`;
+    if (halfC > 0) msg += ` · ${halfC} Menor 50%`;
+    msg += `\n`;
+    msg += `💰 *Total Cuenta:* ${formatCurrency(totalAmt)}\n`;
+    msg += `✅ *Total Abonado:* ${formatCurrency(paidAmt)}\n`;
+    msg += balanceAmt > 0 ? `⚠️ *Saldo Pendiente:* ${formatCurrency(balanceAmt)}\n` : `✨ *Estado:* ¡AL DÍA / TOTALMENTE CANCELADO!\n`;
+    msg += `\n¡Muchas gracias!`;
+
+    window.open(`https://wa.me/${(grad.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
+  };
+
   const handleDownloadReceipt = async (grad, payment) => {
     try {
       await generateReceiptPdf({
@@ -426,6 +451,17 @@ export default function EgresadosEventDetail({
   };
 
   if (!event) return null;
+
+  // Selected Graduate Payments for Digital Statement Preview
+  const previewGradPayments = previewGrad
+    ? payments.filter((p) => p.payer_name?.toLowerCase().trim() === previewGrad.name?.toLowerCase().trim())
+    : [];
+
+  const previewAdultC = Number(previewGrad?.adult_cards || 0);
+  const previewHalfC = Number(previewGrad?.half_cards || 0);
+  const previewTotalAmt = (previewAdultC * cardValue) + (previewHalfC * cardValue * 0.5);
+  const previewPaidAmt = Number(previewGrad?.paid_amount || 0);
+  const previewBalanceAmt = previewTotalAmt - previewPaidAmt;
 
   return (
     <div className="space-y-4">
@@ -496,7 +532,7 @@ export default function EgresadosEventDetail({
               <CreditCard className="w-5 h-5 text-amber-300" /> Detalles de Pagos y Cuentas de Egresados
             </h3>
             <p className="text-xs text-violet-200 mt-0.5">
-              Abre el gestor completo con buscador en vivo, cobranzas e impresión de comprobante PDF por alumno.
+              Abre el gestor completo con buscador en vivo, resumen digital en pantalla e impresión PDF por alumno.
             </p>
           </div>
           <Badge className="bg-white/20 text-white font-bold text-xs py-1 px-3">
@@ -538,7 +574,7 @@ export default function EgresadosEventDetail({
       </div>
 
       {/* ========================================================================= */}
-      {/* 🚀 MODAL PRINCIPAL "DETALLES DE PAGOS Y EGRESADOS" CON BUSCADOR E IMPRESION */}
+      {/* 🚀 MODAL PRINCIPAL "DETALLES DE PAGOS Y EGRESADOS" CON BUSCADOR EN VIVO */}
       {/* ========================================================================= */}
       <Dialog open={paymentsDialogOpen} onOpenChange={setPaymentsDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -691,7 +727,18 @@ export default function EgresadosEventDetail({
                         </div>
 
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          {/* 🔥 BOTÓN IMPRIMIR PDF COMPROBANTE INDIVIDUAL */}
+                          {/* 🔥 BOTÓN VER ESTADO DE CUENTA DIGITAL EN PANTALLA */}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100"
+                            onClick={() => setPreviewGrad(grad)}
+                            title="Ver resumen y estado de cuenta digital en pantalla"
+                          >
+                            <Eye className="w-3.5 h-3.5 mr-1" /> Ver Resumen
+                          </Button>
+
+                          {/* BOTÓN IMPRIMIR PDF COMPROBANTE INDIVIDUAL */}
                           <Button
                             size="sm"
                             className="bg-violet-700 hover:bg-violet-800 text-white text-xs h-8 shadow-sm"
@@ -750,6 +797,124 @@ export default function EgresadosEventDetail({
           <DialogFooter className="pt-2 border-t border-stone-200">
             <Button variant="outline" onClick={() => setPaymentsDialogOpen(false)}>
               Cerrar Detalles
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ========================================================================= */}
+      {/* 📱 MODAL DIGITAL DE RESUMEN Y ESTADO DE CUENTA EN PANTALLA */}
+      {/* ========================================================================= */}
+      <Dialog open={!!previewGrad} onOpenChange={(open) => { if (!open) setPreviewGrad(null); }}>
+        <DialogContent className="max-w-lg bg-stone-900 border-[#C9A04E]/40 text-stone-100 p-6 rounded-2xl shadow-2xl">
+          <DialogHeader>
+            <div className="flex items-center justify-between border-b border-stone-800 pb-3">
+              <div>
+                <Badge className="bg-[#C9A04E] text-black font-bold mb-1">ESTADO DE CUENTA DIGITAL</Badge>
+                <DialogTitle className="text-xl font-display font-bold text-[#E6C57A]">
+                  🎓 {previewGrad?.name}
+                </DialogTitle>
+                <p className="text-xs text-stone-400 mt-0.5">{event.title} · Fecha: {formatDate(event.start_date)}</p>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-xs">
+            {/* Desglose de Tarjetas */}
+            <div className="bg-stone-950 p-3 rounded-xl border border-stone-800 space-y-1.5">
+              <p className="font-semibold text-stone-300">Desglose de Tarjetas Solicitadas:</p>
+              <div className="flex flex-wrap gap-1 text-[11px]">
+                <Badge variant="outline" className="border-stone-700 text-stone-200 bg-stone-900">
+                  {previewGrad?.adult_cards || 0} Adultos ({formatCurrency(cardValue)} c/u)
+                </Badge>
+                {previewGrad?.half_cards > 0 && (
+                  <Badge variant="outline" className="border-stone-700 text-violet-300 bg-stone-900">
+                    {previewGrad.half_cards} Menor 50% ({formatCurrency(cardValue * 0.5)} c/u)
+                  </Badge>
+                )}
+                {previewGrad?.free_under5_cards > 0 && (
+                  <Badge variant="outline" className="border-stone-700 text-amber-300 bg-stone-900">
+                    {previewGrad.free_under5_cards} Menor &lt;5a (Gratis)
+                  </Badge>
+                )}
+              </div>
+              {previewGrad?.cud_cards_detail?.length > 0 && (
+                <div className="pt-1.5 text-[11px] text-emerald-400 space-y-0.5 border-t border-stone-850 mt-1">
+                  {previewGrad.cud_cards_detail.map((b, i) => (
+                    <p key={i} className="flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Pase CUD: {b.name} (DNI: {b.dni || '-'})
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Historial de Pagos */}
+            <div className="space-y-1.5">
+              <p className="font-semibold text-stone-300">Historial de Entregas y Pagos Registrados:</p>
+              {previewGradPayments.length === 0 ? (
+                <p className="text-stone-500 italic py-2">No hay entregas registradas a la fecha.</p>
+              ) : (
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                  {previewGradPayments.map((p) => (
+                    <div key={p.id} className="flex justify-between items-center bg-stone-950 p-2.5 rounded-lg border border-stone-800">
+                      <div>
+                        <span className="font-bold text-emerald-400 text-sm">{formatCurrency(p.amount)}</span>
+                        <span className="text-[11px] text-stone-400 ml-2">· {formatDate(p.date)} ({p.payment_method})</span>
+                      </div>
+                      <span className="text-[10px] text-stone-500 font-mono bg-stone-900 px-2 py-0.5 rounded border border-stone-800">
+                        {p.receipt_number}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Resumen Financiero Digital */}
+            <div className="bg-stone-950 border border-[#C9A04E]/40 rounded-xl p-3.5 flex justify-between items-center text-sm shadow-inner">
+              <div>
+                <p className="text-xs text-stone-400">Total Tarjetas: <strong className="text-stone-200">{formatCurrency(previewTotalAmt)}</strong></p>
+                <p className="text-xs text-emerald-400 font-medium mt-0.5">Total Abonado: <strong>{formatCurrency(previewPaidAmt)}</strong></p>
+              </div>
+              <div className="text-right">
+                {previewBalanceAmt > 0 ? (
+                  <div>
+                    <p className="text-[10px] text-amber-400 uppercase font-bold tracking-wider">Saldo Pendiente</p>
+                    <p className="text-lg font-bold text-amber-300">{formatCurrency(previewBalanceAmt)}</p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-[10px] text-emerald-400 uppercase font-bold tracking-wider">Estado de Cuenta</p>
+                    <p className="text-sm font-bold text-emerald-400">¡AL DÍA / CANCELADO!</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-2">
+            {previewGrad?.phone && (
+              <Button
+                variant="outline"
+                className="w-full text-emerald-400 border-emerald-500/50 hover:bg-emerald-950/40 text-xs"
+                onClick={() => handleSendWhatsAppStatement(previewGrad)}
+              >
+                <Send className="w-3.5 h-3.5 mr-1.5" /> Enviar por WhatsApp
+              </Button>
+            )}
+            <Button
+              className="w-full bg-[#C9A04E] hover:bg-[#b08b3e] text-black font-bold text-xs"
+              onClick={() => handleDownloadIndividualStatement(previewGrad)}
+            >
+              <Printer className="w-3.5 h-3.5 mr-1.5" /> Descargar PDF
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full border-stone-700 text-stone-300 hover:bg-stone-800 text-xs"
+              onClick={() => setPreviewGrad(null)}
+            >
+              Cerrar
             </Button>
           </DialogFooter>
         </DialogContent>
