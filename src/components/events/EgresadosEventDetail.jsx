@@ -13,6 +13,7 @@ import {
   CreditCard,
   Eye,
   Send,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,11 +31,14 @@ import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency, formatDate } from '@/lib/pricing';
 import { generateReceiptPdf } from '@/lib/receiptPdf';
 import { generateEgresadosReportPdf, generateIndividualGraduatePdf } from '@/lib/egresadosPdf';
+import { generateContractPdf } from '@/lib/contractPdf';
 import ContractedServices from './ContractedServices';
+import ContractFormDialog from './ContractFormDialog';
 
 export default function EgresadosEventDetail({
   event,
   budgetServices = [],
+  settings,
   onOpenChange,
   onEventUpdated,
   onDeleteEvent,
@@ -53,6 +57,9 @@ export default function EgresadosEventDetail({
 
   // Digital Account Statement On-Screen Modal State
   const [previewGrad, setPreviewGrad] = useState(null);
+
+  // Contract Form Modal State
+  const [contractModalOpen, setContractModalOpen] = useState(false);
 
   // Card Value Quick Edit
   const [editingCardValue, setEditingCardValue] = useState(false);
@@ -137,6 +144,25 @@ export default function EgresadosEventDetail({
   }, [event?.id]);
 
   const cardValue = Number(event?.card_value) || 0;
+
+  const handleSaveContract = async (contractData) => {
+    await base44.entities.Event.update(event.id, { contract_data: contractData });
+    onEventUpdated({ ...event, contract_data: contractData });
+  };
+
+  const handleQuickDownloadContractPdf = async () => {
+    if (!event.contract_data) {
+      setContractModalOpen(true);
+      return;
+    }
+    try {
+      await generateContractPdf({ event, contractData: event.contract_data, settings });
+      toast({ title: 'Contrato PDF generado con éxito' });
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error al generar el PDF del contrato', variant: 'destructive' });
+    }
+  };
 
   // Save updated Card Value
   const handleSaveCardValue = async () => {
@@ -517,14 +543,44 @@ export default function EgresadosEventDetail({
 
   return (
     <div className="space-y-4">
-      {/* Header & Print Report Action */}
+      {/* Header & Print Actions */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-2 border-b border-stone-200 pb-3">
         <h2 className="text-lg font-semibold text-stone-800 flex items-center gap-2">
           🎓 {event.title}
         </h2>
-        <Button size="sm" variant="outline" className="text-violet-700 border-violet-300 hover:bg-violet-50" onClick={handleExportPDFReport}>
-          <Printer className="w-4 h-4 mr-1.5" /> Informe General PDF
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {event.contract_data ? (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-violet-700 border-violet-300 hover:bg-violet-50 text-xs h-8"
+                onClick={() => setContractModalOpen(true)}
+              >
+                <FileText className="w-3.5 h-3.5 mr-1" /> Ver / Editar Contrato
+              </Button>
+              <Button
+                size="sm"
+                className="bg-violet-700 hover:bg-violet-800 text-white text-xs h-8 shadow-sm"
+                onClick={handleQuickDownloadContractPdf}
+              >
+                <Printer className="w-3.5 h-3.5 mr-1" /> Contrato PDF
+              </Button>
+            </>
+          ) : (
+            <Button
+              size="sm"
+              className="bg-violet-700 hover:bg-violet-800 text-white font-bold text-xs h-8 shadow-sm"
+              onClick={() => setContractModalOpen(true)}
+            >
+              <FileText className="w-3.5 h-3.5 mr-1" /> 📜 Generar Contrato
+            </Button>
+          )}
+
+          <Button size="sm" variant="outline" className="text-stone-700 border-stone-300 hover:bg-stone-50 text-xs h-8" onClick={handleExportPDFReport}>
+            <Printer className="w-3.5 h-3.5 mr-1" /> Informe General PDF
+          </Button>
+        </div>
       </div>
 
       {/* Logistics & Metrics Box */}
@@ -1057,6 +1113,15 @@ export default function EgresadosEventDetail({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Contract Form Modal */}
+      <ContractFormDialog
+        open={contractModalOpen}
+        onOpenChange={setContractModalOpen}
+        event={event}
+        settings={settings}
+        onSaveContract={handleSaveContract}
+      />
     </div>
   );
 }
