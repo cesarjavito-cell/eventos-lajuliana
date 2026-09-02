@@ -24,11 +24,6 @@ const loadImageAsDataURL = (url) =>
 
 /**
  * Generates and downloads an Egresados Ticket Audit & Collection PDF Report.
- * @param {Object} params
- * @param {Object} params.event
- * @param {Array} params.graduates
- * @param {Array} params.payments
- * @param {Object} [params.settings]
  */
 export async function generateEgresadosReportPdf({ event, graduates = [], payments = [], settings }) {
   const quintaName = settings?.quinta_name || 'Quinta La Juliana';
@@ -171,10 +166,10 @@ export async function generateEgresadosReportPdf({ event, graduates = [], paymen
     doc.text(formatCurrency(paidAmt), 152, y);
 
     if (balance > 0) {
-      doc.setTextColor(180, 83, 9); // amber-700
+      doc.setTextColor(180, 83, 9);
       doc.text(formatCurrency(balance), 174, y);
     } else {
-      doc.setTextColor(22, 101, 52); // emerald-800
+      doc.setTextColor(22, 101, 52);
       doc.text('$0', 174, y);
     }
 
@@ -242,5 +237,198 @@ export async function generateEgresadosReportPdf({ event, graduates = [], paymen
   doc.text(`Generado el ${formatDate(new Date().toISOString())}`, 196, 290, { align: 'right' });
 
   const fileName = `informe_egresados_${(event.title || 'colegio').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+  doc.save(fileName);
+}
+
+/**
+ * Generates and downloads an individual PDF Account Statement for a single Graduate.
+ */
+export async function generateIndividualGraduatePdf({ event, graduate, payments = [], settings }) {
+  const quintaName = settings?.quinta_name || 'Quinta La Juliana';
+  const quintaPhone = settings?.quinta_phone || 'Contacto: +54 9 351 123-4567';
+  const cardValue = event?.card_value || 0;
+  const doc = new jsPDF();
+
+  const violetDark = [91, 33, 182];    // violet-800
+  const cream = [245, 240, 232];
+  const ink = [51, 51, 51];
+  const muted = [120, 120, 120];
+
+  // Header Image
+  let headerHeight = 38;
+  try {
+    const loaded = await loadImageAsDataURL(HEADER_IMAGE_URL);
+    headerHeight = Math.min(210 / loaded.ratio, 45);
+    doc.addImage(loaded.dataUrl, 'JPEG', 0, 0, 210, headerHeight);
+  } catch (e) {
+    doc.setFillColor(...violetDark);
+    doc.rect(0, 0, 210, 32, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.setFont(undefined, 'bold');
+    doc.text(quintaName, 105, 16, { align: 'center' });
+    headerHeight = 32;
+  }
+
+  let y = headerHeight + 8;
+
+  // Title Card
+  doc.setFillColor(...cream);
+  doc.roundedRect(14, y, 182, 22, 3, 3, 'F');
+  doc.setTextColor(...violetDark);
+  doc.setFontSize(14);
+  doc.setFont(undefined, 'bold');
+  doc.text('ESTADO DE CUENTA Y COMPROBANTE DE EGRESADO', 20, y + 8);
+
+  doc.setFontSize(9);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(...ink);
+  doc.text(`Evento / Colegio: ${event?.title || 'Fiesta de Egresados'}  ·  Fecha: ${formatDate(event?.start_date)}`, 20, y + 16);
+  y += 30;
+
+  // Student Info Box
+  const adultC = Number(graduate?.adult_cards || 0);
+  const halfC = Number(graduate?.half_cards || 0);
+  const free5C = Number(graduate?.free_under5_cards || 0);
+  const cudList = Array.isArray(graduate?.cud_cards_detail) ? graduate.cud_cards_detail : [];
+  const cudC = cudList.length || Number(graduate?.cud_cards_count || 0);
+
+  const totalAmt = (adultC * cardValue) + (halfC * cardValue * 0.5);
+  const paidAmt = Number(graduate?.paid_amount || 0);
+  const balanceAmt = totalAmt - paidAmt;
+
+  doc.setFillColor(248, 246, 242);
+  doc.setDrawColor(220, 215, 205);
+  doc.roundedRect(14, y, 182, 36, 3, 3, 'FD');
+
+  doc.setFontSize(11);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(...violetDark);
+  doc.text(`Egresado / Alumno: ${graduate?.name || 'Estudiante'}`, 20, y + 8);
+
+  doc.setFontSize(9);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(...ink);
+  if (graduate?.phone) {
+    doc.text(`Teléfono de Contacto: ${graduate.phone}`, 20, y + 15);
+  }
+
+  let cardsText = `Tarjetas: ${adultC} Adulto(s)`;
+  if (halfC > 0) cardsText += ` · ${halfC} Menor 50%`;
+  if (free5C > 0) cardsText += ` · ${free5C} Menor <5a (Sin Cargo)`;
+  if (cudC > 0) cardsText += ` · ${cudC} CUD Discapacidad`;
+
+  doc.text(cardsText, 20, y + 22);
+
+  if (cudList.length > 0) {
+    const cudNames = cudList.map((b) => `${b.name} (DNI ${b.dni || '-'})`).join(', ');
+    doc.setFontSize(8);
+    doc.setTextColor(22, 101, 52);
+    doc.text(`Beneficiarios CUD: ${cudNames}`, 20, y + 29);
+  }
+  y += 44;
+
+  // Payments Table Header
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(...violetDark);
+  doc.text('Historial de Entregas y Pagos Registrados', 14, y);
+  doc.setDrawColor(124, 58, 237);
+  doc.setLineWidth(0.5);
+  doc.line(14, y + 2, 95, y + 2);
+  y += 7;
+
+  doc.setFillColor(245, 245, 245);
+  doc.rect(14, y, 182, 6, 'F');
+  doc.setFontSize(8);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(...ink);
+  doc.text('Fecha', 18, y + 4.5);
+  doc.text('N° Recibo', 55, y + 4.5);
+  doc.text('Método de Pago', 110, y + 4.5);
+  doc.text('Monto Entregado', 190, y + 4.5, { align: 'right' });
+  y += 8;
+
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(8);
+
+  const gradPayments = payments.filter((p) => p.payer_name?.toLowerCase().trim() === graduate?.name?.toLowerCase().trim());
+
+  if (gradPayments.length === 0) {
+    doc.setTextColor(...muted);
+    doc.text('No hay entregas registradas a la fecha.', 18, y + 4);
+    y += 10;
+  } else {
+    gradPayments.forEach((p, idx) => {
+      if (idx % 2 === 1) {
+        doc.setFillColor(250, 250, 250);
+        doc.rect(14, y - 3.5, 182, 6, 'F');
+      }
+      doc.setTextColor(...ink);
+      doc.text(formatDate(p.date), 18, y);
+      doc.text(p.receipt_number || 'REC-COMP', 55, y);
+      doc.text(p.payment_method || 'efectivo', 110, y);
+      doc.setFont(undefined, 'bold');
+      doc.text(formatCurrency(p.amount), 190, y, { align: 'right' });
+      doc.setFont(undefined, 'normal');
+      y += 6.5;
+    });
+  }
+
+  y += 6;
+
+  // Financial Summary Box
+  doc.setFillColor(243, 232, 255);
+  doc.setDrawColor(216, 180, 254);
+  doc.roundedRect(14, y, 182, 28, 3, 3, 'FD');
+
+  doc.setFontSize(9);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(...ink);
+  doc.text(`Costo Total de Tarjetas Solicitadas:`, 20, y + 8);
+  doc.setFont(undefined, 'bold');
+  doc.text(formatCurrency(totalAmt), 190, y + 8, { align: 'right' });
+
+  doc.setFont(undefined, 'normal');
+  doc.text(`Total Abonado a la Fecha:`, 20, y + 15);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(22, 101, 52);
+  doc.text(formatCurrency(paidAmt), 190, y + 15, { align: 'right' });
+
+  doc.setDrawColor(200, 190, 220);
+  doc.line(20, y + 18, 190, y + 18);
+
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'bold');
+  if (balanceAmt > 0) {
+    doc.setTextColor(180, 83, 9);
+    doc.text(`SALDO PENDIENTE:`, 20, y + 24);
+    doc.text(formatCurrency(balanceAmt), 190, y + 24, { align: 'right' });
+  } else {
+    doc.setTextColor(22, 101, 52);
+    doc.text(`ESTADO DE CUENTA:`, 20, y + 24);
+    doc.text(`¡AL DÍA / TOTALMENTE CANCELADO!`, 190, y + 24, { align: 'right' });
+  }
+
+  // Signature / Stamp section
+  y += 40;
+  doc.setDrawColor(180, 180, 180);
+  doc.line(130, y, 190, y);
+  doc.setFontSize(8);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(...muted);
+  doc.text('Firma y Sello Administración', 160, y + 5, { align: 'center' });
+  doc.text(quintaName, 160, y + 9, { align: 'center' });
+
+  // Footer
+  doc.setFillColor(...cream);
+  doc.roundedRect(0, 282, 210, 15, 0, 0, 'F');
+  doc.setTextColor(...muted);
+  doc.setFontSize(8);
+  doc.text(quintaPhone, 14, 290);
+  doc.text(`Emitido el ${formatDate(new Date().toISOString())}`, 196, 290, { align: 'right' });
+
+  const cleanName = (graduate?.name || 'egresado').replace(/[^a-zA-Z0-9]/g, '_');
+  const fileName = `comprobante_egresado_${cleanName}.pdf`;
   doc.save(fileName);
 }

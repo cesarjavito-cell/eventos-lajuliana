@@ -9,6 +9,10 @@ import {
   MessageCircle,
   ShieldCheck,
   Check,
+  Search,
+  CreditCard,
+  UserCheck,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +29,7 @@ import { MobileSelect } from '@/components/ui/mobile-select';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency, formatDate } from '@/lib/pricing';
 import { generateReceiptPdf } from '@/lib/receiptPdf';
-import { generateEgresadosReportPdf } from '@/lib/egresadosPdf';
+import { generateEgresadosReportPdf, generateIndividualGraduatePdf } from '@/lib/egresadosPdf';
 import ContractedServices from './ContractedServices';
 
 export default function EgresadosEventDetail({
@@ -40,6 +44,12 @@ export default function EgresadosEventDetail({
   const [graduates, setGraduates] = useState([]);
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Main Payments Modal Open State
+  const [paymentsDialogOpen, setPaymentsDialogOpen] = useState(false);
+
+  // Search Filter in Payments Modal
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Card Value Quick Edit
   const [editingCardValue, setEditingCardValue] = useState(false);
@@ -57,7 +67,8 @@ export default function EgresadosEventDetail({
     cud_cards_detail: [],
   });
 
-  // Main Screen Quick Add Payment & Guest Account Form
+  // Quick Add Payment Form toggle inside Payments Modal
+  const [showPayForm, setShowPayForm] = useState(false);
   const [payForm, setPayForm] = useState({
     name: '',
     amount: '',
@@ -103,7 +114,6 @@ export default function EgresadosEventDetail({
     if (newVal <= 0) return;
     await base44.entities.Event.update(event.id, { card_value: newVal });
 
-    // Recalculate totals for all graduates
     for (const g of graduates) {
       const adultC = Number(g.adult_cards || 0);
       const halfC = Number(g.half_cards || 0);
@@ -138,6 +148,19 @@ export default function EgresadosEventDetail({
   const plazasPagasEquiv = totalAdultos + totalMenores50 * 0.5;
   const servicesToShow = event?.selected_services?.length > 0 ? event.selected_services : budgetServices;
 
+  // Filtered Graduates based on search
+  const filteredGraduates = graduates.filter((g) => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase().trim();
+    const matchName = (g.name || '').toLowerCase().includes(term);
+    const matchPhone = (g.phone || '').toLowerCase().includes(term);
+    const cudList = Array.isArray(g.cud_cards_detail) ? g.cud_cards_detail : [];
+    const matchCud = cudList.some(
+      (b) => (b.name || '').toLowerCase().includes(term) || (b.dni || '').includes(term)
+    );
+    return matchName || matchPhone || matchCud;
+  });
+
   // Open Dialog to Create or Edit Graduate Account
   const handleOpenGradDialog = (grad = null) => {
     if (grad) {
@@ -164,7 +187,6 @@ export default function EgresadosEventDetail({
     setGradDialogOpen(true);
   };
 
-  // Helper CUD beneficiaries in Dialog
   const handleAddCudBeneficiary = (isPayForm = false) => {
     if (isPayForm) {
       setPayForm((p) => ({ ...p, cud_cards_detail: [...p.cud_cards_detail, { name: '', dni: '' }] }));
@@ -203,7 +225,6 @@ export default function EgresadosEventDetail({
     const halfCards = Number(gradForm.half_cards) || 0;
     const free5Cards = Number(gradForm.free_under5_cards) || 0;
     const cudDetail = (gradForm.cud_cards_detail || []).filter((b) => b && b.name && b.name.trim());
-
     const totalAccountAmount = (adultCards * cardValue) + (halfCards * cardValue * 0.5);
 
     const gradData = {
@@ -233,7 +254,6 @@ export default function EgresadosEventDetail({
     loadData();
   };
 
-  // Register Payment + Auto-calculates Covered Cards
   const handleInjectPayment = async () => {
     const name = payForm.name.trim();
     const amount = Number(payForm.amount) || 0;
@@ -247,7 +267,6 @@ export default function EgresadosEventDetail({
     const cudDetail = (payForm.cud_cards_detail || []).filter((b) => b && b.name && b.name.trim());
 
     if (!grad) {
-      // Calculate how many adult cards this payment covers if cardValue > 0
       const coveredAdults = cardValue > 0 ? Math.max(inputAdults, Math.ceil(amount / cardValue)) : inputAdults;
       const initialTotal = (coveredAdults * cardValue) + (inputHalfs * cardValue * 0.5);
 
@@ -266,12 +285,10 @@ export default function EgresadosEventDetail({
         status: 'pendiente',
       });
     } else {
-      // Graduate already exists: check if total paid amount requires scaling up adult_cards
       const currentPaid = Number(grad.paid_amount || 0);
       const newPaid = currentPaid + amount;
       let adultCards = Number(grad.adult_cards || 0);
 
-      // Auto-scale adult cards if new payment exceeds current account total
       if (cardValue > 0) {
         const minAdultsNeeded = Math.ceil(newPaid / cardValue);
         if (minAdultsNeeded > adultCards) {
@@ -318,7 +335,8 @@ export default function EgresadosEventDetail({
       cud_cards_detail: [],
     });
 
-    toast({ title: 'Pago y tarjetas registradas exitosamente' });
+    setShowPayForm(false);
+    toast({ title: 'Pago registrado exitosamente' });
     loadData();
   };
 
@@ -358,6 +376,16 @@ export default function EgresadosEventDetail({
       });
     } catch (e) {
       toast({ title: 'Error al generar el recibo', variant: 'destructive' });
+    }
+  };
+
+  const handleDownloadIndividualStatement = async (grad) => {
+    try {
+      await generateIndividualGraduatePdf({ event, graduate: grad, payments });
+      toast({ title: 'Comprobante y Estado de Cuenta PDF generado' });
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Error al generar el comprobante PDF', variant: 'destructive' });
     }
   };
 
@@ -407,7 +435,7 @@ export default function EgresadosEventDetail({
           🎓 {event.title}
         </h2>
         <Button size="sm" variant="outline" className="text-violet-700 border-violet-300 hover:bg-violet-50" onClick={handleExportPDFReport}>
-          <Printer className="w-4 h-4 mr-1.5" /> Imprimir Informe PDF
+          <Printer className="w-4 h-4 mr-1.5" /> Informe General PDF
         </Button>
       </div>
 
@@ -460,209 +488,30 @@ export default function EgresadosEventDetail({
         </div>
       </div>
 
-      {/* Planilla de Cobranzas por Egresado */}
-      <div className="border border-stone-200 rounded-lg p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-stone-700">Planilla de Cuentas y Cobranzas:</h3>
-          <Button size="sm" className="bg-violet-600 hover:bg-violet-700 text-white" onClick={() => handleOpenGradDialog()}>
-            <Plus className="w-4 h-4 mr-1" /> Configurar Nuevo Egresado
-          </Button>
-        </div>
-        <div className="border-b border-dashed border-stone-200" />
-
-        {loading ? (
-          <p className="text-sm text-stone-400 text-center py-2">Cargando cuentas...</p>
-        ) : graduates.length === 0 ? (
-          <p className="text-sm text-stone-400 text-center py-2">No hay egresados registrados todavía. Presiona "+ Configurar Nuevo Egresado" o registra un pago abajo.</p>
-        ) : (
-          <div className="space-y-3 divide-y divide-stone-100">
-            {graduates.map((grad) => {
-              const adultC = Number(grad.adult_cards || 0);
-              const halfC = Number(grad.half_cards || 0);
-              const free5C = Number(grad.free_under5_cards || 0);
-              const cudList = Array.isArray(grad.cud_cards_detail) ? grad.cud_cards_detail : [];
-              const cudC = cudList.length || Number(grad.cud_cards_count || 0);
-
-              const totalAccountAmt = (adultC * cardValue) + (halfC * cardValue * 0.5);
-              const paidAmt = Number(grad.paid_amount || 0);
-              const balanceAmt = totalAccountAmt - paidAmt;
-
-              const gradPayments = payments.filter((p) => p.payer_name.toLowerCase() === grad.name.toLowerCase());
-
-              return (
-                <div key={grad.id} className="pt-3 space-y-1.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold text-stone-800">🎓 {grad.name}</span>
-                        {balanceAmt <= 0 && totalAccountAmt > 0 ? (
-                          <Badge className="bg-emerald-100 text-emerald-700 text-[10px]">PAGADO</Badge>
-                        ) : paidAmt > 0 ? (
-                          <Badge className="bg-amber-100 text-amber-700 text-[10px]">PARCIAL</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-stone-400 text-[10px]">PENDIENTE</Badge>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs border-violet-300 text-violet-700 bg-violet-50/60 hover:bg-violet-100"
-                          onClick={() => handleOpenGradDialog(grad)}
-                        >
-                          <Edit2 className="w-3 h-3 mr-1" /> Configurar Tarjetas e Invitados
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-red-400" onClick={() => handleDeleteGraduate(grad)}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-
-                      {/* Badges de desglose de tarjetas */}
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {adultC > 0 && <Badge variant="secondary" className="text-[10px] bg-stone-100">{adultC} Adulto(s) (100%)</Badge>}
-                        {halfC > 0 && <Badge variant="secondary" className="text-[10px] bg-violet-100 text-violet-800">{halfC} Menor &lt;12a (50%)</Badge>}
-                        {free5C > 0 && <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-800">{free5C} Menor &lt;5a (Sin Cargo)</Badge>}
-                        {cudC > 0 && <Badge variant="secondary" className="text-[10px] bg-emerald-100 text-emerald-800">{cudC} CUD Discapacidad (Sin Cargo)</Badge>}
-                      </div>
-
-                      {/* Lista de beneficiarios CUD con DNI */}
-                      {cudList.length > 0 && (
-                        <div className="mt-1.5 space-y-0.5">
-                          {cudList.map((b, bi) => (
-                            <p key={bi} className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
-                              <ShieldCheck className="w-3 h-3" /> Pase CUD: {b.name} (DNI: {b.dni || '-'})
-                            </p>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-bold text-stone-800">
-                        {formatCurrency(paidAmt)} <span className="text-xs font-normal text-stone-400">/ {formatCurrency(totalAccountAmt)}</span>
-                      </p>
-                      {balanceAmt > 0 ? (
-                        <p className="text-xs text-amber-600 font-medium">Saldo: {formatCurrency(balanceAmt)}</p>
-                      ) : (
-                        <p className="text-xs text-emerald-600 font-medium">Al día</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Historial de pagos de esta cuenta */}
-                  {gradPayments.length === 0 ? (
-                    <p className="pl-4 text-xs text-stone-400">Sin pagos registrados</p>
-                  ) : (
-                    gradPayments.map((p) => (
-                      <div key={p.id} className="flex items-center justify-between pl-4 text-xs text-stone-500 bg-stone-50 rounded p-1.5">
-                        <span>• {formatCurrency(p.amount)} el {formatDate(p.date)} ({p.payment_method})</span>
-                        <div className="flex gap-0.5">
-                          {grad.phone && (
-                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleSendReceipt(grad, p)}>
-                              <MessageCircle className="w-3 h-3 text-emerald-600" />
-                            </Button>
-                          )}
-                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDownloadReceipt(grad, p)}>
-                            <FileDown className="w-3 h-3 text-stone-600" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeletePayment(p)}>
-                            <Trash2 className="w-3 h-3 text-red-400" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              );
-            })}
+      {/* 🔥 BOTÓN DESTACADO PANTALLAZO INICIAL: DETALLES DE PAGOS Y EGRESADOS */}
+      <div className="bg-gradient-to-r from-violet-600 to-purple-700 rounded-xl p-4 text-white shadow-md space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 className="font-semibold text-base text-white flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-amber-300" /> Detalles de Pagos y Cuentas de Egresados
+            </h3>
+            <p className="text-xs text-violet-200 mt-0.5">
+              Abre el gestor completo con buscador en vivo, cobranzas e impresión de comprobante PDF por alumno.
+            </p>
           </div>
-        )}
-      </div>
-
-      {/* Payment Injection Form + Direct Guest Ticket Controls */}
-      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-3">
-        <h3 className="text-sm font-semibold text-emerald-700">➕ Registrar Pago en Cuenta de Egresado:</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Nombre del Alumno / Egresado</Label>
-            <Input placeholder="Nombre del Egresado (ej: Almada Sebastián)" value={payForm.name} onChange={(e) => setPayForm((p) => ({ ...p, name: e.target.value }))} />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Monto entregado ($)</Label>
-            <Input type="number" placeholder="Ej: 230000" value={payForm.amount} onChange={(e) => setPayForm((p) => ({ ...p, amount: e.target.value }))} />
-          </div>
-        </div>
-
-        {/* Guest & Special Tickets Configuration inline */}
-        <div className="bg-white p-3 rounded-lg border border-emerald-100 space-y-2">
-          <Label className="text-xs font-semibold text-stone-700 block">
-            🎟️ Configuración de Tarjetas e Invitados de esta cuenta:
-          </Label>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="space-y-1">
-              <Label className="text-[11px] text-stone-600">Adultos (100%)</Label>
-              <Input type="number" min="0" value={payForm.adult_cards} onChange={(e) => setPayForm((p) => ({ ...p, adult_cards: e.target.value }))} className="h-8 text-xs" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[11px] text-stone-600">Menor &lt;12a (50%)</Label>
-              <Input type="number" min="0" value={payForm.half_cards} onChange={(e) => setPayForm((p) => ({ ...p, half_cards: e.target.value }))} className="h-8 text-xs" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[11px] text-stone-600">Menor &lt;5a (Sin Cargo)</Label>
-              <Input type="number" min="0" value={payForm.free_under5_cards} onChange={(e) => setPayForm((p) => ({ ...p, free_under5_cards: e.target.value }))} className="h-8 text-xs" />
-            </div>
-          </div>
-
-          {/* CUD Beneficiaries */}
-          <div className="space-y-1.5 pt-1">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5" /> Personas con Discapacidad CUD (Sin Cargo)
-              </Label>
-              <Button type="button" size="sm" variant="outline" className="h-6 text-[11px] text-emerald-700 border-emerald-300" onClick={() => handleAddCudBeneficiary(true)}>
-                <Plus className="w-3 h-3 mr-1" /> Agregar CUD
-              </Button>
-            </div>
-            {payForm.cud_cards_detail.map((b, idx) => (
-              <div key={idx} className="flex gap-2 items-center">
-                <Input placeholder="Nombre Completo" value={b.name} onChange={(e) => handleUpdateCudBeneficiary(idx, 'name', e.target.value, true)} className="h-7 text-xs flex-1" />
-                <Input placeholder="N° DNI" value={b.dni} onChange={(e) => handleUpdateCudBeneficiary(idx, 'dni', e.target.value, true)} className="h-7 text-xs w-28" />
-                <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-red-500" onClick={() => handleRemoveCudBeneficiary(idx, true)}>
-                  <Trash2 className="w-3 h-3" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Fecha de pago</Label>
-            <Input type="date" value={payForm.date} onChange={(e) => setPayForm((p) => ({ ...p, date: e.target.value }))} />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Método de pago</Label>
-            <MobileSelect
-              value={payForm.payment_method}
-              onValueChange={(v) => setPayForm((p) => ({ ...p, payment_method: v }))}
-              options={[
-                { value: 'efectivo', label: 'Efectivo' },
-                { value: 'transferencia', label: 'Transferencia' },
-                { value: 'tarjeta_debito', label: 'Tarjeta débito' },
-                { value: 'tarjeta_credito', label: 'Tarjeta crédito' },
-              ]}
-              placeholder="Método"
-            />
-          </div>
+          <Badge className="bg-white/20 text-white font-bold text-xs py-1 px-3">
+            {graduates.length} Registrados
+          </Badge>
         </div>
         <Button
-          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-          onClick={handleInjectPayment}
-          disabled={!payForm.name.trim() || !payForm.amount}
+          onClick={() => setPaymentsDialogOpen(true)}
+          className="w-full bg-white text-violet-950 font-bold hover:bg-amber-100 h-11 text-sm shadow-sm"
         >
-          💾 Registrar Pago en Cuenta
+          💳 Abrir Detalles de Pagos y Cuentas ({graduates.length})
         </Button>
       </div>
 
-      {/* Contracted Services (Scales according to plazasPagasEquiv) */}
+      {/* Contracted Services */}
       {servicesToShow.length > 0 && (
         <div className="border border-stone-200 rounded-lg p-4 space-y-2">
           <h3 className="text-sm font-semibold text-stone-700">Servicios a Contratar:</h3>
@@ -674,6 +523,237 @@ export default function EgresadosEventDetail({
           />
         </div>
       )}
+
+      {/* Danger Zone & Back */}
+      <div className="space-y-2 pt-2">
+        <Button
+          className="w-full bg-red-600 hover:bg-red-700 text-white"
+          onClick={handleDeleteEvent}
+        >
+          ❌ Borrar / Cancelar Fiesta Permanentemente
+        </Button>
+        <Button className="w-full" variant="outline" onClick={() => onOpenChange(false)}>
+          🔄 Volver a la Agenda
+        </Button>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 🚀 MODAL PRINCIPAL "DETALLES DE PAGOS Y EGRESADOS" CON BUSCADOR E IMPRESION */}
+      {/* ========================================================================= */}
+      <Dialog open={paymentsDialogOpen} onOpenChange={setPaymentsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between flex-wrap gap-2 text-lg">
+              <span className="flex items-center gap-2 text-violet-900">
+                <CreditCard className="w-5 h-5 text-violet-600" />
+                Detalles de Pagos y Cuentas - {event.title}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button size="sm" className="bg-violet-600 hover:bg-violet-700 text-white text-xs h-8" onClick={() => handleOpenGradDialog()}>
+                  <Plus className="w-3.5 h-3.5 mr-1" /> Configurar Nuevo Egresado
+                </Button>
+                <Button size="sm" variant="outline" className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 text-xs h-8" onClick={() => setShowPayForm(!showPayForm)}>
+                  <Plus className="w-3.5 h-3.5 mr-1" /> Registrar Pago
+                </Button>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* 🔍 BUSCADOR DE EGRESADOS EN TIEMPO REAL */}
+          <div className="relative my-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+            <Input
+              placeholder="🔍 Buscar egresado por nombre o DNI de acompañante CUD..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 h-10 text-sm bg-stone-50 border-stone-300 focus:bg-white"
+            />
+            {searchTerm && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-stone-400 font-medium">
+                {filteredGraduates.length} de {graduates.length} resultados
+              </span>
+            )}
+          </div>
+
+          {/* Quick Pay Form Collapsible */}
+          {showPayForm && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-3 mb-3">
+              <h3 className="text-sm font-semibold text-emerald-800">➕ Registrar Pago en Cuenta de Egresado:</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Nombre del Alumno / Egresado</Label>
+                  <Input placeholder="Nombre del Egresado (ej: Almada Sebastián)" value={payForm.name} onChange={(e) => setPayForm((p) => ({ ...p, name: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Monto entregado ($)</Label>
+                  <Input type="number" placeholder="Ej: 230000" value={payForm.amount} onChange={(e) => setPayForm((p) => ({ ...p, amount: e.target.value }))} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Fecha de pago</Label>
+                  <Input type="date" value={payForm.date} onChange={(e) => setPayForm((p) => ({ ...p, date: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Método de pago</Label>
+                  <MobileSelect
+                    value={payForm.payment_method}
+                    onValueChange={(v) => setPayForm((p) => ({ ...p, payment_method: v }))}
+                    options={[
+                      { value: 'efectivo', label: 'Efectivo' },
+                      { value: 'transferencia', label: 'Transferencia' },
+                      { value: 'tarjeta_debito', label: 'Tarjeta débito' },
+                      { value: 'tarjeta_credito', label: 'Tarjeta crédito' },
+                    ]}
+                    placeholder="Método"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-9" onClick={handleInjectPayment} disabled={!payForm.name.trim() || !payForm.amount}>
+                  💾 Guardar Pago
+                </Button>
+                <Button variant="outline" className="text-xs h-9" onClick={() => setShowPayForm(false)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* LISTA DE EGRESADOS FILTRADA CON BUSCADOR */}
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+            {loading ? (
+              <p className="text-sm text-stone-400 text-center py-6">Cargando cuentas...</p>
+            ) : filteredGraduates.length === 0 ? (
+              <p className="text-sm text-stone-400 text-center py-6">
+                {searchTerm ? `No se encontraron egresados coincidentes con "${searchTerm}".` : 'No hay egresados registrados.'}
+              </p>
+            ) : (
+              filteredGraduates.map((grad) => {
+                const adultC = Number(grad.adult_cards || 0);
+                const halfC = Number(grad.half_cards || 0);
+                const free5C = Number(grad.free_under5_cards || 0);
+                const cudList = Array.isArray(grad.cud_cards_detail) ? grad.cud_cards_detail : [];
+                const cudC = cudList.length || Number(grad.cud_cards_count || 0);
+
+                const totalAccountAmt = (adultC * cardValue) + (halfC * cardValue * 0.5);
+                const paidAmt = Number(grad.paid_amount || 0);
+                const balanceAmt = totalAccountAmt - paidAmt;
+                const gradPayments = payments.filter((p) => p.payer_name.toLowerCase() === grad.name.toLowerCase());
+
+                return (
+                  <div key={grad.id} className="bg-stone-50 border border-stone-200 rounded-xl p-4 space-y-2 hover:bg-stone-100/60 transition-colors">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-base font-bold text-stone-900">🎓 {grad.name}</span>
+                          {balanceAmt <= 0 && totalAccountAmt > 0 ? (
+                            <Badge className="bg-emerald-600 text-white text-[10px]">PAGADO</Badge>
+                          ) : paidAmt > 0 ? (
+                            <Badge className="bg-amber-500 text-white text-[10px]">PARCIAL</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-stone-500 text-[10px]">PENDIENTE</Badge>
+                          )}
+                        </div>
+
+                        {/* Badges de tarjetas */}
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {adultC > 0 && <Badge variant="secondary" className="text-[10px] bg-white border border-stone-200">{adultC} Adulto(s)</Badge>}
+                          {halfC > 0 && <Badge variant="secondary" className="text-[10px] bg-violet-100 text-violet-800">{halfC} Menor 50%</Badge>}
+                          {free5C > 0 && <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-800">{free5C} Menor &lt;5a</Badge>}
+                          {cudC > 0 && <Badge variant="secondary" className="text-[10px] bg-emerald-100 text-emerald-800">{cudC} CUD Discapacidad</Badge>}
+                        </div>
+
+                        {cudList.length > 0 && (
+                          <div className="mt-1 space-y-0.5">
+                            {cudList.map((b, bi) => (
+                              <p key={bi} className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
+                                <ShieldCheck className="w-3 h-3" /> Pase CUD: {b.name} (DNI: {b.dni || '-'})
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Montos y Botones de Acción */}
+                      <div className="flex flex-col items-end gap-2 shrink-0">
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-stone-800">
+                            {formatCurrency(paidAmt)} <span className="text-xs font-normal text-stone-400">/ {formatCurrency(totalAccountAmt)}</span>
+                          </p>
+                          {balanceAmt > 0 ? (
+                            <p className="text-xs text-amber-600 font-medium">Saldo: {formatCurrency(balanceAmt)}</p>
+                          ) : (
+                            <p className="text-xs text-emerald-600 font-semibold">Al día</p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {/* 🔥 BOTÓN IMPRIMIR PDF COMPROBANTE INDIVIDUAL */}
+                          <Button
+                            size="sm"
+                            className="bg-violet-700 hover:bg-violet-800 text-white text-xs h-8 shadow-sm"
+                            onClick={() => handleDownloadIndividualStatement(grad)}
+                            title="Imprimir Comprobante / Estado de Cuenta PDF"
+                          >
+                            <Printer className="w-3.5 h-3.5 mr-1" /> Imprimir PDF
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs border-stone-300 hover:bg-white"
+                            onClick={() => handleOpenGradDialog(grad)}
+                          >
+                            <Edit2 className="w-3.5 h-3.5 mr-1" /> Editar
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-red-400 hover:bg-red-50" onClick={() => handleDeleteGraduate(grad)}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Historial de Pagos de este Egresado */}
+                    <div className="mt-2 pt-2 border-t border-stone-200/60 space-y-1">
+                      {gradPayments.length === 0 ? (
+                        <p className="text-xs text-stone-400 italic">Sin entregas registradas</p>
+                      ) : (
+                        gradPayments.map((p) => (
+                          <div key={p.id} className="flex items-center justify-between text-xs text-stone-600 bg-white rounded-lg p-2 border border-stone-200">
+                            <span>• {formatCurrency(p.amount)} el {formatDate(p.date)} ({p.payment_method})</span>
+                            <div className="flex gap-1">
+                              {grad.phone && (
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleSendReceipt(grad, p)}>
+                                  <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                                </Button>
+                              )}
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDownloadReceipt(grad, p)}>
+                                <FileDown className="w-3.5 h-3.5 text-stone-600" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500" onClick={() => handleDeletePayment(p)}>
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <DialogFooter className="pt-2 border-t border-stone-200">
+            <Button variant="outline" onClick={() => setPaymentsDialogOpen(false)}>
+              Cerrar Detalles
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog for Creating/Editing Graduate Account & Special Tickets */}
       <Dialog open={gradDialogOpen} onOpenChange={setGradDialogOpen}>
@@ -714,7 +794,6 @@ export default function EgresadosEventDetail({
                 </div>
               </div>
 
-              {/* Seccion Personas con Discapacidad CUD */}
               <div className="space-y-2 pt-2 border-t border-stone-200">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
@@ -738,10 +817,6 @@ export default function EgresadosEventDetail({
                     </Button>
                   </div>
                 ))}
-
-                {gradForm.cud_cards_detail.length === 0 && (
-                  <p className="text-[11px] text-stone-400 italic">No hay beneficiarios CUD agregados. Haz clic en "+ Agregar CUD".</p>
-                )}
               </div>
 
               <div className="bg-white p-2.5 rounded border border-stone-200 flex justify-between items-center text-xs">
@@ -761,19 +836,6 @@ export default function EgresadosEventDetail({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Danger Zone */}
-      <Button
-        className="w-full bg-red-600 hover:bg-red-700 text-white"
-        onClick={handleDeleteEvent}
-      >
-        ❌ Borrar / Cancelar Fiesta Permanentemente
-      </Button>
-
-      {/* Back Button */}
-      <Button className="w-full" variant="outline" onClick={() => onOpenChange(false)}>
-        🔄 Volver a la Agenda
-      </Button>
     </div>
   );
 }
