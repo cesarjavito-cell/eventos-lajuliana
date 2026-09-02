@@ -96,8 +96,35 @@ export default function EgresadosEventDetail({
         base44.entities.Graduate.filter({ event_id: event.id }),
         base44.entities.Payment.filter({ event_id: event.id }),
       ]);
-      setGraduates(gradData || []);
-      setPayments(payData || []);
+
+      const fetchedGrads = gradData || [];
+      const fetchedPays = payData || [];
+
+      // Auto-recalculate and sync paid_amount for all graduates in Firestore
+      for (const g of fetchedGrads) {
+        const gPayments = fetchedPays.filter(
+          (p) => (p.payer_name || '').toLowerCase().trim() === (g.name || '').toLowerCase().trim()
+        );
+        const actualPaid = gPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+        const adultC = Number(g.adult_cards || 0);
+        const halfC = Number(g.half_cards || 0);
+        const cardVal = Number(event?.card_value || 0);
+        const totalAccountAmt = (adultC * cardVal) + (halfC * cardVal * 0.5);
+        const status = actualPaid >= totalAccountAmt && totalAccountAmt > 0 ? 'pagado' : actualPaid > 0 ? 'parcial' : 'pendiente';
+
+        if (g.paid_amount !== actualPaid || g.status !== status) {
+          try {
+            await base44.entities.Graduate.update(g.id, { paid_amount: actualPaid, status });
+            g.paid_amount = actualPaid;
+            g.status = status;
+          } catch (err) {
+            console.warn('Could not sync graduate paid_amount:', err);
+          }
+        }
+      }
+
+      setGraduates(fetchedGrads);
+      setPayments(fetchedPays);
     } catch (err) {
       console.error(err);
     } finally {
@@ -121,9 +148,13 @@ export default function EgresadosEventDetail({
       const adultC = Number(g.adult_cards || 0);
       const halfC = Number(g.half_cards || 0);
       const newTotal = (adultC * newVal) + (halfC * newVal * 0.5);
-      const paid = Number(g.paid_amount || 0);
-      const status = paid >= newTotal ? 'pagado' : paid > 0 ? 'parcial' : 'pendiente';
-      await base44.entities.Graduate.update(g.id, { total_amount: newTotal, card_amount: newVal, status });
+
+      const gPayments = payments.filter(
+        (p) => (p.payer_name || '').toLowerCase().trim() === (g.name || '').toLowerCase().trim()
+      );
+      const paid = gPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const status = paid >= newTotal && newTotal > 0 ? 'pagado' : paid > 0 ? 'parcial' : 'pendiente';
+      await base44.entities.Graduate.update(g.id, { total_amount: newTotal, card_amount: newVal, paid_amount: paid, status });
     }
 
     onEventUpdated({ ...event, card_value: newVal });
@@ -235,6 +266,12 @@ export default function EgresadosEventDetail({
     const cudDetail = (gradForm.cud_cards_detail || []).filter((b) => b && b.name && b.name.trim());
     const totalAccountAmount = (adultCards * cardValue) + (halfCards * cardValue * 0.5);
 
+    const gPayments = payments.filter(
+      (p) => (p.payer_name || '').toLowerCase().trim() === name.toLowerCase().trim()
+    );
+    const paidAmt = gPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const status = paidAmt >= totalAccountAmount && totalAccountAmount > 0 ? 'pagado' : paidAmt > 0 ? 'parcial' : 'pendiente';
+
     const gradData = {
       event_id: event.id,
       name,
@@ -246,15 +283,15 @@ export default function EgresadosEventDetail({
       cud_cards_count: cudDetail.length,
       total_amount: totalAccountAmount,
       card_amount: cardValue,
+      paid_amount: paidAmt,
+      status,
     };
 
     if (editingGrad) {
-      const paidAmt = Number(editingGrad.paid_amount || 0);
-      const status = paidAmt >= totalAccountAmount && totalAccountAmount > 0 ? 'pagado' : paidAmt > 0 ? 'parcial' : 'pendiente';
-      await base44.entities.Graduate.update(editingGrad.id, { ...gradData, paid_amount: paidAmt, status });
+      await base44.entities.Graduate.update(editingGrad.id, gradData);
       toast({ title: 'Cuenta de Egresado actualizada' });
     } else {
-      await base44.entities.Graduate.create({ ...gradData, paid_amount: 0, status: 'pendiente' });
+      await base44.entities.Graduate.create(gradData);
       toast({ title: 'Egresado registrado correctamente' });
     }
 
@@ -274,8 +311,14 @@ export default function EgresadosEventDetail({
     const inputFree5 = Number(payForm.free_under5_cards) || 0;
     const cudDetail = (payForm.cud_cards_detail || []).filter((b) => b && b.name && b.name.trim());
 
+    const existingGradPayments = payments.filter(
+      (p) => (p.payer_name || '').toLowerCase().trim() === name.toLowerCase().trim()
+    );
+    const currentPaid = existingGradPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const newPaid = currentPaid + amount;
+
     if (!grad) {
-      const coveredAdults = cardValue > 0 ? Math.max(inputAdults, Math.ceil(amount / cardValue)) : inputAdults;
+      const coveredAdults = cardValue > 0 ? Math.max(inputAdults, Math.ceil(newPaid / cardValue)) : inputAdults;
       const initialTotal = (coveredAdults * cardValue) + (inputHalfs * cardValue * 0.5);
 
       grad = await base44.entities.Graduate.create({
@@ -289,12 +332,10 @@ export default function EgresadosEventDetail({
         cud_cards_count: cudDetail.length,
         total_amount: initialTotal,
         card_amount: cardValue,
-        paid_amount: 0,
-        status: 'pendiente',
+        paid_amount: newPaid,
+        status: newPaid >= initialTotal ? 'pagado' : 'parcial',
       });
     } else {
-      const currentPaid = Number(grad.paid_amount || 0);
-      const newPaid = currentPaid + amount;
       let adultCards = Number(grad.adult_cards || 0);
 
       if (cardValue > 0) {
@@ -305,12 +346,17 @@ export default function EgresadosEventDetail({
       }
 
       const updatedTotal = (adultCards * cardValue) + (Number(grad.half_cards || 0) * cardValue * 0.5);
+      const newStatus = newPaid >= updatedTotal && updatedTotal > 0 ? 'pagado' : 'parcial';
       await base44.entities.Graduate.update(grad.id, {
         adult_cards: adultCards,
         total_amount: updatedTotal,
+        paid_amount: newPaid,
+        status: newStatus,
       });
       grad.adult_cards = adultCards;
       grad.total_amount = updatedTotal;
+      grad.paid_amount = newPaid;
+      grad.status = newStatus;
     }
 
     const receiptNumber = `REC-${Date.now().toString().slice(-6)}`;
@@ -323,10 +369,6 @@ export default function EgresadosEventDetail({
       payment_method: payForm.payment_method,
       receipt_number: receiptNumber,
     });
-
-    const newGradPaid = (grad.paid_amount || 0) + amount;
-    const newGradStatus = newGradPaid >= (grad.total_amount || cardValue) ? 'pagado' : 'parcial';
-    await base44.entities.Graduate.update(grad.id, { paid_amount: newGradPaid, status: newGradStatus });
 
     const newEventPaid = (event.paid_amount || 0) + amount;
     await base44.entities.Event.update(event.id, { paid_amount: newEventPaid });
@@ -352,10 +394,12 @@ export default function EgresadosEventDetail({
     if (!confirm('¿Eliminar este pago?')) return;
     await base44.entities.Payment.delete(payment.id);
 
-    const grad = graduates.find((g) => g.name === payment.payer_name);
+    const grad = graduates.find((g) => g.name.toLowerCase().trim() === (payment.payer_name || '').toLowerCase().trim());
     if (grad) {
-      const newGradPaid = Math.max(0, (grad.paid_amount || 0) - payment.amount);
-      const newGradStatus = newGradPaid <= 0 ? 'pendiente' : newGradPaid >= (grad.total_amount || cardValue) ? 'pagado' : 'parcial';
+      const remainingPayments = payments.filter((p) => p.id !== payment.id && (p.payer_name || '').toLowerCase().trim() === grad.name.toLowerCase().trim());
+      const newGradPaid = remainingPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const totalAccountAmt = Number(grad.total_amount || 0);
+      const newGradStatus = newGradPaid <= 0 ? 'pendiente' : newGradPaid >= totalAccountAmt && totalAccountAmt > 0 ? 'pagado' : 'parcial';
       await base44.entities.Graduate.update(grad.id, { paid_amount: newGradPaid, status: newGradStatus });
     }
 
@@ -372,10 +416,12 @@ export default function EgresadosEventDetail({
   };
 
   const handleSendWhatsAppStatement = (grad) => {
+    const gradPayments = payments.filter((p) => (p.payer_name || '').toLowerCase().trim() === (grad.name || '').toLowerCase().trim());
+    const paidAmt = gradPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
     const adultC = Number(grad?.adult_cards || 0);
     const halfC = Number(grad?.half_cards || 0);
     const totalAmt = (adultC * cardValue) + (halfC * cardValue * 0.5);
-    const paidAmt = Number(grad?.paid_amount || 0);
     const balanceAmt = totalAmt - paidAmt;
 
     let msg = `*RESUMEN Y ESTADO DE CUENTA DE EGRESADO*\n*Quinta La Juliana*\n\n`;
@@ -431,11 +477,12 @@ export default function EgresadosEventDetail({
 
   const handleDeleteGraduate = async (grad) => {
     if (!confirm(`¿Eliminar la cuenta de ${grad.name} y todos sus pagos?`)) return;
-    const gradPayments = payments.filter((p) => p.payer_name === grad.name);
+    const gradPayments = payments.filter((p) => (p.payer_name || '').toLowerCase().trim() === grad.name.toLowerCase().trim());
+    const gradTotal = gradPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
     for (const p of gradPayments) {
       await base44.entities.Payment.delete(p.id);
     }
-    const gradTotal = grad.paid_amount || 0;
     await base44.entities.Graduate.delete(grad.id);
     if (gradTotal > 0) {
       const newEventPaid = Math.max(0, (event.paid_amount || 0) - gradTotal);
@@ -459,13 +506,13 @@ export default function EgresadosEventDetail({
 
   // Selected Graduate Payments for Digital Statement Preview
   const previewGradPayments = previewGrad
-    ? payments.filter((p) => p.payer_name?.toLowerCase().trim() === previewGrad.name?.toLowerCase().trim())
+    ? payments.filter((p) => (p.payer_name || '').toLowerCase().trim() === (previewGrad.name || '').toLowerCase().trim())
     : [];
 
   const previewAdultC = Number(previewGrad?.adult_cards || 0);
   const previewHalfC = Number(previewGrad?.half_cards || 0);
   const previewTotalAmt = (previewAdultC * cardValue) + (previewHalfC * cardValue * 0.5);
-  const previewPaidAmt = Number(previewGrad?.paid_amount || 0);
+  const previewPaidAmt = previewGradPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
   const previewBalanceAmt = previewTotalAmt - previewPaidAmt;
 
   return (
@@ -537,7 +584,7 @@ export default function EgresadosEventDetail({
               <CreditCard className="w-5 h-5 text-amber-300" /> Detalles de Pagos y Cuentas de Egresados
             </h3>
             <p className="text-xs text-violet-200 mt-0.5">
-              Lista ordenada alfabéticamente con buscador en vivo, resumen digital en pantalla e impresión PDF.
+              Lista ordenada alfabéticamente con cálculo dinámico en vivo, resumen digital en pantalla e impresión PDF.
             </p>
           </div>
           <Badge className="bg-white/20 text-white font-bold text-xs py-1 px-3">
@@ -680,9 +727,13 @@ export default function EgresadosEventDetail({
                 const cudC = cudList.length || Number(grad.cud_cards_count || 0);
 
                 const totalAccountAmt = (adultC * cardValue) + (halfC * cardValue * 0.5);
-                const paidAmt = Number(grad.paid_amount || 0);
+
+                // DYNAMICALLY SUM payments for 100% financial accuracy
+                const gradPayments = payments.filter(
+                  (p) => (p.payer_name || '').toLowerCase().trim() === (grad.name || '').toLowerCase().trim()
+                );
+                const paidAmt = gradPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
                 const balanceAmt = totalAccountAmt - paidAmt;
-                const gradPayments = payments.filter((p) => p.payer_name.toLowerCase() === grad.name.toLowerCase());
 
                 return (
                   <div key={grad.id} className="bg-stone-50 border border-stone-200 rounded-xl p-4 space-y-2 hover:bg-stone-100/60 transition-colors">
@@ -876,7 +927,7 @@ export default function EgresadosEventDetail({
               )}
             </div>
 
-            {/* Resumen Financiero Digital */}
+            {/* Resumen Financiero Digital con Suma Dinamica */}
             <div className="bg-stone-950 border border-[#C9A04E]/40 rounded-xl p-3.5 flex justify-between items-center text-sm shadow-inner">
               <div>
                 <p className="text-xs text-stone-400">Total Tarjetas: <strong className="text-stone-200">{formatCurrency(previewTotalAmt)}</strong></p>

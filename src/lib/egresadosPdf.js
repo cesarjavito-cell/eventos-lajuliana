@@ -3,7 +3,7 @@ import { formatCurrency, formatDate } from './pricing';
 
 /**
  * Generates and downloads an Egresados Ticket Audit & Collection PDF Report.
- * Clean, modern header without "PROPUESTA" banner, with graduates sorted alphabetically.
+ * Dynamically sums payments for 100% precision across all accounts.
  */
 export async function generateEgresadosReportPdf({ event, graduates = [], payments = [], settings }) {
   const quintaName = settings?.quinta_name || 'Quinta La Juliana';
@@ -58,7 +58,7 @@ export async function generateEgresadosReportPdf({ event, graduates = [], paymen
     (a.name || '').localeCompare(b.name || '', 'es', { sensitivity: 'base' })
   );
 
-  // Aggregated Summary
+  // Aggregated Summary (calculated dynamically from actual payments)
   let totalRecaudado = 0;
   let totalAdultos = 0;
   let totalMenores50 = 0;
@@ -66,7 +66,12 @@ export async function generateEgresadosReportPdf({ event, graduates = [], paymen
   let totalCUD = 0;
 
   sortedGraduates.forEach((g) => {
-    totalRecaudado += Number(g.paid_amount || 0);
+    const gradPayments = payments.filter(
+      (p) => (p.payer_name || '').toLowerCase().trim() === (g.name || '').toLowerCase().trim()
+    );
+    const paidAmt = gradPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    totalRecaudado += paidAmt;
+
     totalAdultos += Number(g.adult_cards || 0);
     totalMenores50 += Number(g.half_cards || 0);
     totalSinCargo5 += Number(g.free_under5_cards || 0);
@@ -129,7 +134,12 @@ export async function generateEgresadosReportPdf({ event, graduates = [], paymen
     const cudC = cudList.length || Number(g.cud_cards_count || 0);
 
     const totalAmt = (adultC * cardValue) + (halfC * cardValue * 0.5);
-    const paidAmt = Number(g.paid_amount || 0);
+
+    // Calculate paid amount dynamically from payments array
+    const gradPayments = payments.filter(
+      (p) => (p.payer_name || '').toLowerCase().trim() === (g.name || '').toLowerCase().trim()
+    );
+    const paidAmt = gradPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
     const balance = totalAmt - paidAmt;
 
     let cardsLabel = `${adultC} Adultos`;
@@ -229,6 +239,7 @@ export async function generateEgresadosReportPdf({ event, graduates = [], paymen
 
 /**
  * Generates and downloads an individual PDF Account Statement for a single Graduate.
+ * Sums payments dynamically for 100% financial precision.
  */
 export async function generateIndividualGraduatePdf({ event, graduate, payments = [], settings }) {
   const quintaName = settings?.quinta_name || 'Quinta La Juliana';
@@ -283,7 +294,14 @@ export async function generateIndividualGraduatePdf({ event, graduate, payments 
   const cudC = cudList.length || Number(graduate?.cud_cards_count || 0);
 
   const totalAmt = (adultC * cardValue) + (halfC * cardValue * 0.5);
-  const paidAmt = Number(graduate?.paid_amount || 0);
+
+  // Filter payments for this exact graduate
+  const gradPayments = payments.filter(
+    (p) => (p.payer_name || '').toLowerCase().trim() === (graduate?.name || '').toLowerCase().trim()
+  );
+
+  // DYNAMIC RE-SUM of all actual payments for 100% accuracy
+  const paidAmt = gradPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
   const balanceAmt = totalAmt - paidAmt;
 
   doc.setFillColor(248, 246, 242);
@@ -340,8 +358,6 @@ export async function generateIndividualGraduatePdf({ event, graduate, payments 
 
   doc.setFont(undefined, 'normal');
   doc.setFontSize(8);
-
-  const gradPayments = payments.filter((p) => p.payer_name?.toLowerCase().trim() === graduate?.name?.toLowerCase().trim());
 
   if (gradPayments.length === 0) {
     doc.setTextColor(...muted);
