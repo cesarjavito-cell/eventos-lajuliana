@@ -165,11 +165,13 @@ export async function generateReceiptPdf(data) {
   const sigY = 242;
 
   try {
-    const loadedSig = await loadImageAsDataURL('/signature.png');
+    const loadedSig = await loadImageAsDataURL('/firma_javier_almada.png');
     doc.addImage(loadedSig.dataUrl, 'PNG', 14, sigY - 26, 65, 24);
   } catch (e) {
     try {
-      doc.addImage(JAVIER_ALMADA_SIGNATURE, 'PNG', 14, sigY - 26, 65, 24);
+      if (JAVIER_ALMADA_SIGNATURE) {
+        doc.addImage(JAVIER_ALMADA_SIGNATURE, 'PNG', 14, sigY - 26, 65, 24);
+      }
     } catch (err) {
       console.warn('Error embedding signature image:', err);
     }
