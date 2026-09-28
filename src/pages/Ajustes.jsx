@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { MEASUREMENT_LABELS, CATEGORY_LABELS, formatCurrency } from '@/lib/pricing';
 import { ensureSeedServices } from '@/lib/seedServices';
 import { exportBackupJSON, importBackupJSON } from '@/lib/localEntityStore';
+import { exportFirestoreDirectJSON } from '@/lib/firestoreExport';
 import { getStoredFirebaseConfig, saveFirebaseConfig } from '@/lib/firebaseConfig';
 import ServiceFormDialog from '@/components/settings/ServiceFormDialog';
 import CabinFormDialog from '@/components/settings/CabinFormDialog';
@@ -23,6 +24,7 @@ export default function Ajustes() {
   const [settingsForm, setSettingsForm] = useState({ next_year_inflation: 0, following_year_inflation: 0, quinta_name: 'Quinta La Juliana', quinta_phone: '' });
   const [loading, setLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [exportingFirestore, setExportingFirestore] = useState(false);
 
   const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState(null);
@@ -154,6 +156,28 @@ export default function Ajustes() {
       toast({ title: '¡Copia descargada con éxito!', description: 'Respaldo v2 verificado con SHA-256 e inventario completo de 11 entidades.' });
     } catch (e) {
       toast({ title: 'Error al exportar backup', description: e.message || 'No se pudo generar el archivo de backup.', variant: 'destructive' });
+    }
+  };
+
+  const handleExportFirestoreDirect = async () => {
+    setExportingFirestore(true);
+    try {
+      const jsonStr = await exportFirestoreDirectJSON();
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const timestampStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      a.download = `quinta-la-juliana-firestore-backup-${timestampStr}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: '¡Respaldo Firestore descargado!', description: 'Lectura directa de 11 colecciones con tipos y hashes conservados.' });
+    } catch (e) {
+      toast({ title: 'Error al consultar Firestore', description: e.message || 'No se pudo generar el respaldo directo.', variant: 'destructive' });
+    } finally {
+      setExportingFirestore(false);
     }
   };
 
@@ -357,6 +381,23 @@ export default function Ajustes() {
                 <input type="file" accept=".json" ref={fileInputRef} onChange={handleImportFile} className="hidden" />
                 <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 w-full">
                   <Upload className="w-4 h-4 mr-2" /> Cargar / Restaurar Archivo (.json)
+                </Button>
+              </div>
+
+              <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-5 flex flex-col justify-between space-y-4 md:col-span-2">
+                <div>
+                  <h3 className="font-semibold text-blue-900 text-sm flex items-center gap-2">
+                    <Cloud className="w-4 h-4 text-blue-600" /> Respaldo Directo desde Google Cloud Firestore
+                  </h3>
+                  <p className="text-xs text-stone-600 mt-1">
+                    Consulta las 11 colecciones de la nube en tiempo real y descarga un respaldo directo independiente conservando tipos y hashes SHA-256.
+                  </p>
+                  <p className="text-xs font-medium text-blue-700 mt-1">
+                    🔒 Solo lectura — no modifica datos.
+                  </p>
+                </div>
+                <Button onClick={handleExportFirestoreDirect} disabled={exportingFirestore} className="bg-blue-600 hover:bg-blue-700 text-white w-full">
+                  <Download className="w-4 h-4 mr-2" /> {exportingFirestore ? 'Consultando Firestore...' : 'Exportar respaldo directo de Firestore'}
                 </Button>
               </div>
             </div>
