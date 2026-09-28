@@ -145,12 +145,15 @@ export default function Ajustes() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `quinta_la_juliana_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const timestampStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      a.download = `quinta-la-juliana-backup-${timestampStr}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      toast({ title: 'Copia descargada', description: 'Se guardaron todos tus servicios, presupuestos y datos.' });
+      toast({ title: '¡Copia descargada con éxito!', description: 'Respaldo v2 verificado con SHA-256 e inventario completo de 11 entidades.' });
     } catch (e) {
-      toast({ title: 'Error', description: 'No se pudo exportar el backup', variant: 'destructive' });
+      toast({ title: 'Error al exportar backup', description: e.message || 'No se pudo generar el archivo de backup.', variant: 'destructive' });
     }
   };
 
